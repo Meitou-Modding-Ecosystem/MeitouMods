@@ -1,0 +1,61 @@
+# Releases one mod: a tag <slug>-v<version> (rivalry-core-v0.2.0) builds that mod, checks the version against its meitou.json, and publishes
+# <Mod>-<version>.zip holding the folder to drop into Kenshi/mods/.
+name: Release
+
+on:
+  push:
+    tags: ["*-v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          submodules: recursive
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 11.0.x
+
+      - name: Mod and version
+        id: mod
+        shell: pwsh
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          # Tag slug -> mod folder. Add a line per mod.
+          $mods = @{ 'rivalry-core' = 'RivalryCore' }
+          if ($env:TAG -notmatch '^(?<slug>[a-z0-9-]+)-v(?<version>[0-9A-Za-z.\-]+)$') { throw "bad tag '$env:TAG'" }
+          $folder = $mods[$Matches.slug]
+          if (-not $folder) { throw "no mod for tag slug '$($Matches.slug)'" }
+          $manifest = Get-Content "$folder/meitou.json" -Raw | ConvertFrom-Json
+          if ($manifest.version -ne $Matches.version) { throw "tag version $($Matches.version) is not meitou.json's $($manifest.version)" }
+          "folder=$folder" >> $env:GITHUB_OUTPUT
+          "version=$($Matches.version)" >> $env:GITHUB_OUTPUT
+
+      - name: Test
+        run: dotnet test -c Release
+
+      - name: Package
+        shell: pwsh
+        env:
+          FOLDER: ${{ steps.mod.outputs.folder }}
+          VERSION: ${{ steps.mod.outputs.version }}
+        run: |
+          $out = "package/$env:FOLDER"
+          dotnet publish "$env:FOLDER" -c Release -o $out
+          # Only the mod's own files: the game supplies its assemblies.
+          Get-ChildItem $out -File | Where-Object { $_.Name -notmatch "^$env:FOLDER\.(dll|pdb|mod)$|^meitou\.json$" } | Remove-Item
+          Get-ChildItem $out -Directory | Remove-Item -Recurse
+          Compress-Archive -Path $out -DestinationPath "$env:FOLDER-$env:VERSION.zip"
+
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          FOLDER: ${{ steps.mod.outputs.folder }}
+          VERSION: ${{ steps.mod.outputs.version }}
+        run: gh release create "$GITHUB_REF_NAME" "$FOLDER-$VERSION.zip" --title "$FOLDER $VERSION" --generate-notes

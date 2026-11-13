@@ -1,0 +1,10 @@
+<Project>
+
+  <!-- The engine's build settings (target framework, warnings as errors, code style), so a mod builds exactly as the game does. -->
+  <Import Project="engine/Directory.Build.props" />
+
+  <PropertyGroup>
+    <Product>Meitou mods</Product>
+  </PropertyGroup>
+
+</Project>
