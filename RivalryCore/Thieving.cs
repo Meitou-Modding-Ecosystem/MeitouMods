@@ -91,7 +91,8 @@ public sealed class BurgleBehaviour : IBehaviour
     }
 
     /// <summary>
-    /// Phase 1: once the squad is in the world its members are taken from the AI, set sneaking and given their rolled skills.
+    /// Phase 1: once the squad is in the world its members are taken from the AI, set sneaking and given their rolled skills; the leader gets the
+    /// run's evidence (<see cref="Evidence.Plant"/>).
     /// </summary>
     static bool Load(BehaviourContext context, BehaviourRun run)
     {
@@ -101,6 +102,7 @@ public sealed class BurgleBehaviour : IBehaviour
 
         SquadDriver.Hold(world, run.Platoon, squad, held: true, sneak: true);
         SquadDriver.RollSkills(context, run, squad);
+        Evidence.Plant(context, run, squad, CrimeCode.Burglary);
         run.Phase = Stealing;
         run.Until = world.GameHours + run.Args.Number("hours", 12);
         return true;

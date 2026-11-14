@@ -5,9 +5,9 @@ using Meitou.Data.Fcs;
 namespace AshenHand;
 
 /// <summary>
-/// The order's records (docs/ashen-hand.md "Data file"): the faction, a thief and a hunter, and a squad of each. The people are copies of the
-/// game's own Dust Bandit (gear, body and looks), so the file is built from the installed game and holds no game content of its own, only the
-/// copied fields and links by id.
+/// The order's records (docs/ashen-hand.md "Data file"): the faction, a thief and a hunter, a squad of each, and the ledger their leaders carry. The
+/// people are copies of the game's own Dust Bandit (gear, body and looks) and the ledger of its first book item, so the file is built from the
+/// installed game and holds no game content of its own, only the copied fields and links by id.
 /// </summary>
 public static class AshenHandData
 {
@@ -20,12 +20,20 @@ public static class AshenHandData
     /// The record ids.
     /// </summary>
     public const string Faction = "1-" + FileName, Thief = "2-" + FileName, Hunter = "3-" + FileName, ThiefSquad = "4-" + FileName,
-        HunterSquad = "5-" + FileName;
+        HunterSquad = "5-" + FileName, Ledger = "6-" + FileName;
 
     /// <summary>
     /// The game's character the order's people are copied from, by its name in the data files.
     /// </summary>
     public const string Model = "Dust Bandit";
+
+    /// <summary>
+    /// The ledger's text: a hunter's log of days spent on one target.
+    /// </summary>
+    public const string LedgerText = "A soot-stained notebook bound in grey cloth, marked with an ash-black handprint. Its pages log days of watching"
+        + " one mark: where they slept, when they ate, which roads they took and who walked with them, each entry signed with the same initials."
+        + " Proof that its owner stalked the mark for days. The law would want to see it.\n[Right-click to hand it to the law: a bounty on its"
+        + " owner with every lawful faction]";
 
     /// <summary>
     /// Builds the data file from the game's records. Throws when the game has no <see cref="Model"/> character.
@@ -35,17 +43,54 @@ public static class AshenHandData
         var model = CharacterAppearance.Find(game, Model, FcsRecordType.Character)
             ?? throw new InvalidOperationException($"The game data has no CHARACTER '{Model}'.");
 
+        var book = Book(game);
         var file = new FcsFile { Author = "MeitouMods", Description = "The Ashen Hand: its faction, thieves and hunters. Generated; see docs/ashen-hand.md." };
         file.Records.AddRange([
             FactionRecord(),
             Person(model, Thief, "Ashen Hand Thief", armed: false),
             Person(model, Hunter, "Ashen Hand Hunter", armed: true),
             SquadRecord(ThiefSquad, "Ashen Hand thieves", Thief, 1, 4),
-            SquadRecord(HunterSquad, "Ashen Hand hunters", Hunter, 3, 5)]);
+            SquadRecord(HunterSquad, "Ashen Hand hunters", Hunter, 3, 5),
+            LedgerRecord(book)]);
         for (int k = 0; k < file.Records.Count; k++) file.Records[k].Id = k + 1;
 
         file.NextId = file.Records.Count + 1;
         return file;
+    }
+
+    /// <summary>
+    /// The game's book the ledger is copied from (look, icon, size and weight): the ITEM named "Books", else the first ITEM by id whose name has
+    /// "book" in it; null when the game has none.
+    /// </summary>
+    static GameRecord? Book(GameDatabase game)
+    {
+        var books = game.OfType(FcsRecordType.Item)
+            .Where(r => r.Name.Contains("book", StringComparison.OrdinalIgnoreCase))
+            .OrderBy(r => r.Name == "Books" ? 0 : 1)
+            .ThenBy(r => r.StringId, StringComparer.Ordinal)
+            .ToList();
+        return books.FirstOrDefault();
+    }
+
+    /// <summary>
+    /// The ledger: the book's fields and links (none without a book: no look, one cell, 0.2 kg), its own name and text, one per stack, worth
+    /// little and no trade good.
+    /// </summary>
+    static FcsRecord LedgerRecord(GameRecord? book)
+    {
+        var record = New(Ledger, FcsRecordType.Item, "Ashen Hand Ledger");
+        record.Floats["weight kg"] = 0.2f;
+        if (book is not null)
+        {
+            CopyFields(book, record);
+            foreach (string list in book.ReferenceLists) record.References[list] = [.. book.GetReferences(list).Select(Link)];
+        }
+
+        record.Strings["description"] = LedgerText;
+        record.Ints["stackable"] = 1;
+        record.Ints["value"] = 20;
+        record.Bools["trade item"] = false;
+        return record;
     }
 
     /// <summary>
