@@ -1,6 +1,6 @@
 # The Ashen Hand (content mod)
 
-A shadow order built on [Rivalry Core](rivalry-core.md) (`ashen.hand`, needs `rivalry.core` 0.3). Code: `AshenHand/`; data file generator:
+A shadow order built on [Rivalry Core](rivalry-core.md) (`ashen.hand`, needs `rivalry.core` 0.4). Code: `AshenHand/`; data file generator:
 `AshenHand.Data/`; tests: `AshenHand.Tests/`. The name is a working title.
 
 ## Lore
@@ -21,12 +21,17 @@ A shadow order built on [Rivalry Core](rivalry-core.md) (`ashen.hand`, needs `ri
 
 The player's cats are not in any container, so an outpost that holds only cats gives thieves nothing to take but pockets.
 
+Both rules pass `evidence` = the ledger, so each squad's leader carries an Ashen Hand Ledger (Rivalry Core's [Evidence](rivalry-core.md#evidence)):
+a log of days spent watching a mark. Right-clicked in a player character's inventory it puts a bounty on its owner with every lawful faction,
+2 × the run's goal and at least 3000 (3000 for both today), so turning the owner in pays where executing them does not.
+
 ## Data file
 
 `AshenHand.mod`, record ids `<n>-AshenHand.mod`: 1 the faction (default relation 0, no roaming population), 2 the thief and 3 the hunter
 (copies of the game's CHARACTER `Dust Bandit`: every field and link but those whose list starts with `dialog`; `faction` the order; the
 thief also without `weapons` and `crossbows`), 4 the thief squad (`squad`: thief, 1 to 4) and 5 the hunter squad (hunter, 3 to 5). The squads
-have no AI package: Rivalry Core drives them.
+have no AI package: Rivalry Core drives them. 6 the ledger: an ITEM copying every field and link of the game's ITEM "Books" (else the first
+ITEM by id with "book" in its name; with none, no look, 0.2 kg), with its own name and text, `stackable` 1, `value` 20, no trade item.
 
 The people are copied from the installed game, so the file is generated, not committed (`.mod` is git-ignored):
 

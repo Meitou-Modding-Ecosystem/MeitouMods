@@ -1,5 +1,6 @@
 using System.Numerics;
 using Meitou.Simulation;
+using Meitou.Simulation.Crime;
 
 namespace Rivalry;
 
@@ -104,7 +105,8 @@ public sealed class PursueBehaviour : IBehaviour
     }
 
     /// <summary>
-    /// Phase 1: once the squad is in the world it is taken from the AI and remembers its quarry as an enemy.
+    /// Phase 1: once the squad is in the world it is taken from the AI and remembers its quarry as an enemy; the leader gets the run's evidence
+    /// (<see cref="Evidence.Plant"/>).
     /// </summary>
     bool Load(BehaviourContext context, BehaviourRun run)
     {
@@ -114,6 +116,7 @@ public sealed class PursueBehaviour : IBehaviour
 
         SquadDriver.Hold(world, run.Platoon, squad, held: true);
         SquadDriver.RollSkills(context, run, squad);
+        Evidence.Plant(context, run, squad, CrimeCode.Assault);
         if (Quarry(context, run) is { IsNone: false } quarry)
             context.System<DialogueSystem>()?.Memory.Flag(world, squad.Id, quarry, MemoryTag.TempEnemy);
 

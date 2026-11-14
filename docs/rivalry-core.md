@@ -115,6 +115,18 @@ where the quarry is now at every step, and within 150 orders its idle members to
 gone, no hunter can act or `hours` are up. The quarry is not saved: after a load the run takes the standing player character its faction
 holds the largest grudge against. Needs no AI_PACKAGE. **Unknown** in play.
 
+### Evidence
+
+Burgle and Pursue plant evidence when their squad loads (`Evidence.Plant`): with a text arg `evidence` (an ITEM record), the squad's first
+living member gets one in its main grid, its `ModTag` `rivalry.evidence|<portrait serial>|<bounty>|<crime>`. Bounty: `evidenceFactor` (2) ×
+`goal`, at least `evidenceMin` (3000); crime Burglary for Burgle, Assault for Pursue. A dependent registers `c.AddItemUse(record, Evidence.Use)`
+(engine "Item use"): a right click on a tagged note in a player character's own inventory adds the bounty to the named character's entry with
+every booking faction (each faction's `BookingOf`, once), raised now and claimable again, posts a line and uses the note up. A character not
+in the world (dead, or its platoon unloaded) leaves the note and posts that its owner is nowhere to be found; an untagged item of the record
+moves as usual. The portrait serial is saved with the character and the tag with the item, so a note survives a load. A bounty under 4000
+draws no bounty hunters and lasts 0.04 h per cat (3000: 120 h) from use. **Unknown** in play, including whether police arrest such a
+character on sight.
+
 ## Actions
 
 | Decision | Carried out by |

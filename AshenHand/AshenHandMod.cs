@@ -5,7 +5,7 @@ namespace AshenHand;
 
 /// <summary>
 /// The Ashen Hand's entry (docs/ashen-hand.md): two rules for Rivalry Core. Thieves visit a wealthy outpost; hunters come for a character the
-/// order holds a grudge against.
+/// order holds a grudge against. Each squad's leader carries a ledger that, handed to the law, puts a bounty on them.
 /// </summary>
 public sealed class AshenHandMod : IMod
 {
@@ -36,6 +36,7 @@ public sealed class AshenHandMod : IMod
 
         var rivalry = c.Dependency<IRivalryApi>(RivalryMod.Id) ?? throw new InvalidOperationException("The Ashen Hand needs Rivalry Core.");
         Register(rivalry.For(c.Id), Settings);
+        c.AddItemUse(AshenHandData.Ledger, Evidence.Use);
     }
 
     /// <summary>
@@ -63,6 +64,7 @@ public sealed class AshenHandMod : IMod
         Faction = (a, _) => a.Data.FactionIndex(AshenHandData.Faction),
         Args = (_, _) => new BehaviourArgs()
             .Set("template", AshenHandData.ThiefSquad)
+            .Set("evidence", AshenHandData.Ledger)
             .Set("goal", ThiefGoal)
             .Set("stealthMin", 40)
             .Set("stealthMax", 60)
@@ -86,6 +88,7 @@ public sealed class AshenHandMod : IMod
         Faction = (a, _) => a.Data.FactionIndex(AshenHandData.Faction),
         Args = (_, _) => new BehaviourArgs()
             .Set("template", AshenHandData.HunterSquad)
+            .Set("evidence", AshenHandData.Ledger)
             .Set("meleeAttackMin", 35)
             .Set("meleeAttackMax", 55)
             .Set("meleeDefenceMin", 35)
