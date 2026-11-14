@@ -28,7 +28,7 @@ jobs:
           TAG: ${{ github.ref_name }}
         run: |
           # Tag slug -> mod folder. Add a line per mod.
-          $mods = @{ 'rivalry-core' = 'RivalryCore' }
+          $mods = @{ 'rivalry-core' = 'RivalryCore'; 'ashen-hand' = 'AshenHand' }
           if ($env:TAG -notmatch '^(?<slug>[a-z0-9-]+)-v(?<version>[0-9A-Za-z.\-]+)$') { throw "bad tag '$env:TAG'" }
           $folder = $mods[$Matches.slug]
           if (-not $folder) { throw "no mod for tag slug '$($Matches.slug)'" }
