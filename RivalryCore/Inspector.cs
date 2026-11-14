@@ -1,8 +1,11 @@
 using System.Numerics;
 using Meitou.Data;
+using Meitou.Data.Gameplay.Construction;
+using Meitou.Data.Gameplay.Economy;
 using Meitou.Simulation;
 using Meitou.Simulation.Construction;
 using Meitou.Simulation.Items;
+using Meitou.Simulation.Trading;
 using Stat = Meitou.Data.Gameplay.Bodies.StatsEnumerated;
 
 namespace Rivalry;
@@ -23,7 +26,16 @@ public sealed class Inspector(PopulationData data, IReadOnlyList<(string Name, F
     /// <summary>The rating used for a character without stats (an engine choice).</summary>
     public const float DefaultStrength = 10;
 
-    readonly Dictionary<string, int> _values = new(StringComparer.Ordinal);
+    /// <summary>
+    /// The game's item prices (<see cref="Market.BaseValue"/>: quality, material and manufacturer, as an inventory tooltip shows). The record's
+    /// <c>value</c> field alone ignores all three. The seed only drives trader factors, which are not read here.
+    /// </summary>
+    readonly Market _market = new(data, 0);
+
+    /// <summary>
+    /// What a finished building's construction materials are worth, by BUILDING record id.
+    /// </summary>
+    readonly Dictionary<string, long> _buildingValues = new(StringComparer.Ordinal);
 
     public PlayerReport Inspect(World world)
     {
@@ -118,6 +130,7 @@ public sealed class Inspector(PopulationData data, IReadOnlyList<(string Name, F
         {
             Public = town.Public,
             Beds = world.Fixtures.All.Count(f => f.Kind == Meitou.Simulation.Locks.FixtureKind.Bed && f.Owner == player && TownAt(towns, f.Position) == town.Number),
+            BuildingValue = BuildingsValue(world, town.Number),
         };
     }
 
@@ -134,6 +147,37 @@ public sealed class Inspector(PopulationData data, IReadOnlyList<(string Name, F
             else if (function == ResearchFunction) research = Math.Max(research, level);
         }
         return (buildings, turrets, gates, research);
+    }
+
+    /// <summary>
+    /// What the town's finished buildings (furniture included: beds, benches and storage are BUILDING records too) cost in construction materials.
+    /// </summary>
+    long BuildingsValue(World world, int town)
+    {
+        long total = 0;
+        foreach (var b in world.Buildings.All)
+            if (b.Town == town && b.Complete && !b.Destroyed && !b.Ruined) total += BuildingValueOf(b.Record);
+        return total;
+    }
+
+    /// <summary>
+    /// A BUILDING record's materials (its <c>construction</c> list, else <c>build materials</c> of building materials) at their base price.
+    /// </summary>
+    long BuildingValueOf(string record)
+    {
+        if (_buildingValues.TryGetValue(record, out long known)) return known;
+        if (data.Db.Find(record) is not { } building) return _buildingValues[record] = 0;
+
+        long value = 0;
+        foreach (var cost in BuildingBuildData.From(building).Materials)
+        {
+            if (data.Db.Find(cost.Item) is not { } item) continue;
+
+            int price = ItemValue.Of(data.Db, item, 0, true, _market.Constants);
+            value += (long)(price * cost.Required);
+        }
+
+        return _buildingValues[record] = value;
     }
 
     (int Function, int TechLevel) FunctionOf(string record)
@@ -198,14 +242,8 @@ public sealed class Inspector(PopulationData data, IReadOnlyList<(string Name, F
     long Value(IEnumerable<ItemInstance> items)
     {
         long total = 0;
-        foreach (var item in items) total += (long)ValueOf(item.Record) * Math.Max(1, item.Quantity);
+        foreach (var item in items) total += (long)_market.BaseValue(item) * Math.Max(1, item.Quantity);
         return total;
-    }
-
-    int ValueOf(string record)
-    {
-        if (!_values.TryGetValue(record, out int value)) _values[record] = value = data.Db.Find(record)?.GetInt("value") ?? 0;
-        return value;
     }
 
     /// <summary>The number of the nearest player town whose radius holds the point (ground plane); 0 for none.</summary>

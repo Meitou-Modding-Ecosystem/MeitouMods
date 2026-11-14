@@ -140,8 +140,9 @@ public sealed class RivalryMod : IMod, IRivalryApi, IModDependents
     {
         if (system is null) return "no world yet";
         var r = system.Report;
-        var towns = string.Join("; ", r.Towns.Select(t => $"{t.Name}: {t.Buildings} bldg, {t.StoredValue} stored, defence {t.Defence:0} vs threat {t.Threat:0}"));
+        var towns = string.Join("; ", r.Towns.Select(t => $"{t.Name}: {t.Buildings} bldg worth {t.BuildingValue}, {t.StoredValue} stored, defence {t.Defence:0} vs threat {t.Threat:0}"));
         string last = system.History.Count > 0 ? system.History[^1] : "no decisions yet";
-        return $"{r.Characters.Count} chars, wealth {r.Wealth}, {system.Notoriety.Count} grudges | {towns} | {last}";
+        string wealth = $"wealth {r.Wealth} (money {r.Money}, carried {r.Carried}, stored {r.Stored}, built {r.Built})";
+        return $"{r.Characters.Count} chars, {wealth}, {system.Notoriety.Count} grudges | {towns} | {last}";
     }
 }
