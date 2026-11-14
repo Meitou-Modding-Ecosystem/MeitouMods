@@ -23,13 +23,14 @@ A throwing rule or director is logged and off for the rest of that world; a fail
 | Report | Contents |
 | --- | --- |
 | `CharacterReport` | each living player-faction character: id, name, squad, position, town (nearest player town whose radius holds it), down, in combat, strength, gear value (equipment sections), carried value (the rest, bags included); `Value(probe)` |
-| `TownReport` | each player town: finished buildings, turrets (function 12), gates (21), highest research `tech level` (3), value in player-owned containers, defenders (player characters in it), defenders down, defence, hostiles standing in it, threat; `UnderAttack`, `Balance` = defence / threat; `Public`, `Beds` (the player's bed fixtures); `Value(probe)` |
+| `TownReport` | each player town: finished buildings, turrets (function 12), gates (21), highest research `tech level` (3), value in player-owned containers, building value (finished buildings and furniture at their construction materials' base price), defenders (player characters in it), defenders down, defence, hostiles standing in it, threat; `UnderAttack`, `Balance` = defence / threat; `Public`, `Beds` (the player's bed fixtures); `Value(probe)` |
 | `CampaignReport` | running campaigns aimed at a player town: faction, FACTION_CAMPAIGN id, town, phase, hostile |
-| `PlayerReport` | the above, money, `Wealth`, `Strongest` |
+| `PlayerReport` | the above, money, `Carried` (worn and carried), `Stored` (town containers), `Built` (building value), `Wealth` (all four), `Strongest` |
 
 Engine choices (framework's own, not the original's): strength = mean of melee attack, melee defence, dexterity, toughness (10 without stats, 0
 while down); defence = defenders' strength + 15 per turret; hostile = faction relation ≤ -30 with the player, or a squad whose campaign war
-targets include the player. Item value = the record's `value` × quantity. Function numbers: [campaigns](https://github.com/TheIvoryDisaster/MeitouClient/blob/master/docs/game/factions-squads-towns.md#campaigns).
+targets include the player. Item value = the game's base price (`Market.BaseValue`: quality, material, manufacturer) × quantity; **Observed** (2026-11-13, a new game
+without a base): the record's `value` field alone gave wealth 0. `rivalry.tempting` counts only what can be stolen (stored, carried), not buildings. Function numbers: [campaigns](https://github.com/TheIvoryDisaster/MeitouClient/blob/master/docs/game/factions-squads-towns.md#campaigns).
 
 ## Notoriety
 
