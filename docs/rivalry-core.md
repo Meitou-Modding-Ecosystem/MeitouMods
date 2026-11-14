@@ -201,7 +201,7 @@ character loses its grudges across a save made before the rename.
 ## Debug rows (F10)
 
 A row with a field takes its values separated by commas, in the order below; spaces round a value are dropped, so a name cannot hold a comma.
-`[x]` may be left out. The row's own status line only says what was queued; the outcome is a `debug:` line in the game log one tick later, and
+`[x]` may be left out. The row's own status line only says what was queued; the outcome is a `debug:` line in the game log one tick later (so the game must not be paused), and
 `Rivalry: report` shows the latest line.
 
 | Row | Field | Does |
