@@ -54,6 +54,7 @@ director and key.
 | condition | `rivalry.town-public` | the town is open to the public |
 | behaviour | `rivalry.raid`, `rivalry.reinforce`, `rivalry.hunt` | the `Raid`, `Reinforce`, `Hunt` actions below; args `campaign`, `delay`, `nearby`, `package`, `squads`, `hours` |
 | behaviour | `rivalry.visit` | see "Visit" |
+| behaviour | `rivalry.burgle`, `rivalry.pursue` | see "Burgle" and "Pursue": squads the mod walks itself |
 | rule | `rivalry.reinforce` | town `rivalry.losing`: `rivalry.reinforce` by the closest ally (relation ≥ 50; allies with a DEFEND_TOWN campaign first); once per town per 12 h |
 | rule | `rivalry.opportunist` | town `rivalry.tempting`, chance `RaidChancePerDay`: `rivalry.raid` by the most hostile faction that has an assault campaign; once per town per 96 h |
 | director | `rivalry.grudge` | a non-allied faction's grudge on a standing character ≥ `HuntThreshold` (60): `Hunt` with `HuntSquads` squads; largest first, at most 2 per assessment, once per faction and character name per 48 h |
@@ -69,7 +70,8 @@ kind's order: not cooling, conditions hold, roll (`Assessment.Roll("{rule}/{key}
 
 `IBehaviour.Start(context, request)` returns a log line; one that lasts calls `context.Begin(this, request, until)` for a `BehaviourRun`
 (id, behaviour, source, key, faction, town, platoon, phase, started, until, args) and is stepped by `Step(context, run)` every slow step until
-it returns false. The run is the behaviour's only state. `BehaviourContext`: world, data, report, options, population, `Roll`, `Apply(decision)`.
+it returns false. The run is the behaviour's only state. `BehaviourContext`: world, data, report, options, population, grudges (`Notoriety`),
+`Roll`, `Apply(decision)`, `ValueOf(item)` (the report's prices), `System<T>()`.
 
 ### Visit
 
@@ -77,6 +79,41 @@ it returns false. The run is the behaviour's only state. `BehaviourContext`: wor
 `maxRadius` 1200, `money`): phase 0 `SpawnPlatoon` in the ring round the town, homed at the nearest town site, tried each step for 24 h when no
 spot is walkable; phase 1 waits up to 24 h for the platoon to load, then sends `VisitTown` at the next tick; phase 2 ends when the stay + 24 h
 has passed or the platoon is gone. **Unknown**: everything in play (see "Evidence"); a town that is not public sends the trader away at once.
+
+### Driving a squad
+
+`SquadDriver`, for a behaviour that walks its squad itself instead of giving it a package: `Hold` (`PopulationSystem.HoldPlatoon` and
+`CharacterCold.Engaged` on each member, optionally the Sneak order), `Keep` (holds again; a hold is not saved, so driven runs call it every
+step), `GiveBack`, `Able` (members that can act), `WalkTo` (true within 20; a walk under way is left alone unless `redirect`) and `RollSkills`:
+a number argument named `<skill>Min` (and `<skill>Max`), the skill a `StatsEnumerated` name in any case (`stealthMin`, `martialArtsMax`),
+gives every member that skill uniformly in the range when the squad loads. A run that ends, or whose squad unloads, gives the platoon back.
+
+### Burgle
+
+`rivalry.burgle` (args: text `template`; numbers `goal` 1000 cats, `hours` 12, `minRadius` 600, `maxRadius` 1200, `salePrice` 1000, skill
+ranges). The run keeps `loot`, its spawn point and the buyer's site in its args.
+
+| Phase | What happens | Next |
+| --- | --- | --- |
+| 0 spawning, 1 loading | as Visit; the platoon is held, and once loaded its members sneak and get their skills | 2 |
+| 2 stealing | each thief walks to one of the player's containers in the town, the one with the most valuable stack first; a locked one is picked with `LockSystem.Picking.Step` (the game's time and its Burglary for witnesses); it takes the most valuable stack that fits (a Theft). No container with goods left: it pickpockets the player character in the town carrying the most (`CrimeSystem.Pickpocket`, the game's roll) | seen, or caught pickpocketing: 3; `loot` ≥ `goal` or `hours` up: 5 |
+| 3 fighting | sneaking ends; the thieves are ordered onto the nearest standing player character and left to the fight. After it, one lifts the nearest downed player character a buyer exists for | carrying: 4; nobody to take or `hours` up: 5 |
+| 4 abducting | the squad walks to the buyer's town; the captive's hunger is held at 1.5 of 3 (`CharacterCold.FedTo`). Within 400 of the town centre the nearest able member of the buyer's faction takes the captive as a slave (`ArrestSystem.TakeOver`) and the squad's purse gets `salePrice` | sold, body lost or 72 h up: 5 |
+| 5 leaving | the squad runs back to its spawn point; there, or after 6 h, it is given back to the game | ends |
+
+Seen: a thief is in combat, has a pending crime that was witnessed (`Pending.Timer` ≥ `CrimeSystem.CaughtTimer`), or
+`AggroSystem.Spotted` says a standing player character has it. Buyer (`SlaveMarket`): the nearest town site whose faction is not hostile to the
+thieves and keeps slaves of the captive's race, that is one of its squad templates lists a `slaves` character of that race; so the game's own
+data decides who enslaves whom. **Unknown**: everything in play, above all NPC sneaking against player characters, a walk through zones that
+unload (the carrier and captive then travel as a stand-in or not at all), and what a released squad without a package does.
+
+### Pursue
+
+`rivalry.pursue` (target: a character; args: text `template`; numbers `hours` 24, `minRadius` 800, `maxRadius` 1500, skill ranges): spawns
+in the ring round the quarry, holds the platoon, marks the quarry TEMP_ENEMY for the squad (so [hunter barks](#hunter-barks) apply), runs to
+where the quarry is now at every step, and within 150 orders its idle members to attack. Ends, giving the squad back, when the quarry is down or
+gone, no hunter can act or `hours` are up. The quarry is not saved: after a load the run takes the standing player character its faction
+holds the largest grudge against. Needs no AI_PACKAGE. **Unknown** in play.
 
 ## Actions
 
@@ -178,6 +215,7 @@ Tests: `dotnet test RivalryCore.Tests` (synthetic worlds, no game needed).
 
 **Verified** by `RivalryCore.Tests` (synthetic worlds without a population system): the reinforce rule and its nearby squad, a grudge's
 hunt, grudges and cooldowns across a save, a dependent's probe/condition/rule firing once per cooldown, a run across a save, a version 1 save
-loading, name prefixes and dropping a mod's pieces, the world hash on 1 and 4 threads. **Unknown**: everything in a real game (campaign starts
+loading, name prefixes and dropping a mod's pieces, the world hash on 1 and 4 threads, which races a faction buys (`SlaveMarket`). Burgle and
+Pursue have no test of their steps. **Unknown**: everything in a real game (campaign starts
 from `RequestCampaign`, contract packages, the Visit behaviour end to end, a run's platoon found again after a real load), and the
 `meitou-tools mod-check` result.

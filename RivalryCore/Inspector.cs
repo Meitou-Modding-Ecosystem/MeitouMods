@@ -239,6 +239,11 @@ public sealed class Inspector(PopulationData data, IReadOnlyList<(string Name, F
         return (gear, Value(inventory.All()) - gear);
     }
 
+    /// <summary>
+    /// What a stack is worth at the game's prices.
+    /// </summary>
+    public long ValueOf(ItemInstance item) => (long)_market.BaseValue(item) * Math.Max(1, item.Quantity);
+
     long Value(IEnumerable<ItemInstance> items)
     {
         long total = 0;
