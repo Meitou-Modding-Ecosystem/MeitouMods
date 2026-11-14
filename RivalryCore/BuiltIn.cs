@@ -25,7 +25,8 @@ public static class BuiltIn
     /// <summary>
     /// Behaviours.
     /// </summary>
-    public const string Raid = "rivalry.raid", Reinforce = "rivalry.reinforce", Hunt = "rivalry.hunt", Visit = "rivalry.visit";
+    public const string Raid = "rivalry.raid", Reinforce = "rivalry.reinforce", Hunt = "rivalry.hunt", Visit = "rivalry.visit",
+        Burgle = "rivalry.burgle", Pursue = "rivalry.pursue";
 
     /// <summary>
     /// Registers the built-ins.
@@ -45,6 +46,8 @@ public static class BuiltIn
         r.AddBehaviour(new ReinforceBehaviour());
         r.AddBehaviour(new HuntBehaviour());
         r.AddBehaviour(new VisitBehaviour());
+        r.AddBehaviour(new BurgleBehaviour());
+        r.AddBehaviour(new PursueBehaviour());
 
         r.AddRule(ReinforceRule());
         r.AddRule(OpportunistRule());
@@ -233,7 +236,7 @@ public sealed class VisitBehaviour : IBehaviour
     /// <summary>
     /// The town site nearest to a point (ties by index): a spawned platoon's home; -1 without sites.
     /// </summary>
-    static int NearestSite(PopulationData data, Vector2 at)
+    internal static int NearestSite(PopulationData data, Vector2 at)
     {
         int best = -1;
         float bestDistance = float.MaxValue;

@@ -229,7 +229,7 @@ public sealed partial class RivalrySystem : ICombatHitObserver, IStateHashed, IM
 
     Assessment NewAssessment(World world) => new(world, _data, Report, Notoriety, _options, _purpose, _catalogue);
 
-    BehaviourContext Context(World world) => new(world, _data, Report, _options, _purpose, _actions, _runs, _population);
+    BehaviourContext Context(World world) => new(world, _data, Report, _options, _purpose, _actions, _runs, _population, _inspector, Notoriety);
 
     List<Decision> Decide(World world)
     {

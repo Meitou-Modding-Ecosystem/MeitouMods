@@ -269,4 +269,27 @@ public class RivalryCoreTests
 
         Assert.Equal(Run(1), Run(4));
     }
+
+    [Fact]
+    public void A_faction_buys_captives_only_of_the_races_its_squads_keep_as_slaves()
+    {
+        var keeper = Rec("70-a", FcsRecordType.Faction, "Keepers");
+        keeper.References["squads"] = [new FcsReference("71-a", 1, 0, 0)];
+        var squad = Rec("71-a", FcsRecordType.SquadTemplate, "Keepers with slaves");
+        squad.References["slaves"] = [new FcsReference("72-a", 2, 0, 0)];
+        var slave = Rec("72-a", FcsRecordType.Character, "Slave");
+        slave.References["race"] = [new FcsReference("73-a", 100, 0, 0)];
+
+        var file = new FcsFile();
+        file.Records.AddRange([keeper, squad, slave, Rec("60-a", FcsRecordType.Faction, "Friends")]);
+        var db = new GameDatabase();
+        db.Apply(file, "test.mod");
+        var data = PopulationData.Create(db, []);
+        var market = new SlaveMarket(data);
+
+        Assert.True(market.Buys(data.FactionIndex("70-a"), "73-a"));
+        Assert.False(market.Buys(data.FactionIndex("70-a"), "74-a"));    // a race it keeps no slaves of
+        Assert.False(market.Buys(data.FactionIndex("60-a"), "73-a"));    // a faction without slaves
+        Assert.Equal(-1, market.NearestBuyer(TownAt, "73-a", data.FactionIndex("60-a")));   // no town to sell in
+    }
 }
