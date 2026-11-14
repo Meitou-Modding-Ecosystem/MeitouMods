@@ -20,6 +20,9 @@ public sealed class RivalryOptions
     [Setting("Opportunist raids", Hint = "Hostile factions raid towns that look rich and poorly defended.")]
     public bool OpportunistRaids { get; set; } = true;
 
+    [Setting("Hunters speak", Hint = "A hunter who fights someone on the way to its quarry says so over its head.")]
+    public bool HunterBarks { get; set; } = true;
+
     [Setting("Grudge half-life (days)", Min = 0.5, Max = 30, Step = 0.5)]
     public double GrudgeHalfLifeDays { get; set; } = 4;
 
@@ -57,6 +60,16 @@ public sealed class RivalryOptions
     public float HuntHours { get; set; } = 24;
     public double HuntCooldownHours { get; set; } = 48;
     public int MaxHuntsPerAssessment { get; set; } = 2;
+
+    /// <summary>
+    /// What a hunter says when it starts a fight with anyone but its quarry; <c>{target}</c> is the quarry's name.
+    /// </summary>
+    public string OffTargetLine { get; set; } = "I'll tear through you like paper if it gets me closer to putting down {target} like a dog!";
+
+    /// <summary>
+    /// Game seconds a hunting squad stays quiet after one of its members speaks.
+    /// </summary>
+    public float BarkCooldownSeconds { get; set; } = 30;
 
     /// <summary>How far from a town under attack loaded squads of the reinforcing faction are sent in at once.</summary>
     public float ReinforceRadius { get; set; } = 8000;

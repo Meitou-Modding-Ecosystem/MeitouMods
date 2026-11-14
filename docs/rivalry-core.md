@@ -131,6 +131,14 @@ public void Initialize(ModContext c)
   outside cooldowns (`TryClaim`/`Cooling`) and runs, which are hashed and saved.
 - `IRivalryApi.In(world)` gives the report, ledger, history and runs to a dependent's own systems (serial steps only).
 
+## Hunter barks
+
+A hunting squad is one of a faction with a grudge at `HuntThreshold` against a player character whose squad memory holds TEMP_ENEMY on that
+character (what `Hunt` sets; the tag fades 6 game hours after its last write, so the hunt and its barks end with it). Every 15 ticks the system
+reads each member's combat target (`CombatSystem.TargetOf`); a member that has just turned on anyone but its quarry says `OffTargetLine`
+(`{target}` = the quarry's name) through `World.Bark`, at most one member per squad per `BarkCooldownSeconds` (30). Switch: "Hunters speak".
+Display only: the bark state is not hashed or saved.
+
 ## Dialogue codes
 
 | Code | Kind | Meaning |
