@@ -40,6 +40,7 @@ public sealed partial class RivalrySystem : ICombatHitObserver, IStateHashed, IM
     readonly RuleEngine _rules;
     readonly BehaviourRuns _runs;
     readonly PopulationSystem? _population;
+    readonly HunterBarks _barks;
     readonly Cooldowns _cooldowns = new();
     readonly HashSet<string> _faulted = new(StringComparer.Ordinal);
     readonly List<string> _history = [];
@@ -61,7 +62,9 @@ public sealed partial class RivalrySystem : ICombatHitObserver, IStateHashed, IM
         _inspector = new Inspector(_data, [.. registry.TownProbes.Select(e => (e.Name, e.Value))], [.. registry.CharacterProbes.Select(e => (e.Name, e.Value))]);
         _population = context.Find<PopulationSystem>();
         _catalogue = new Catalogue(_data, _population);
-        _actions = new Actions(_data, _population, context.Find<DialogueSystem>()?.Memory, Notoriety, _catalogue);
+        var memory = context.Find<DialogueSystem>()?.Memory;
+        _actions = new Actions(_data, _population, memory, Notoriety, _catalogue);
+        _barks = new HunterBarks(context.Find<CombatSystem>(), memory);
         _rules = new RuleEngine(registry, log);
         _runs = new BehaviourRuns(_data, registry.Behaviours.ToDictionary(e => e.Name, e => e.Value, StringComparer.Ordinal), log);
     }
@@ -111,6 +114,7 @@ public sealed partial class RivalrySystem : ICombatHitObserver, IStateHashed, IM
         _world = world;
         ResolveSaved(world);
         CheckKills(world);
+        _barks.Step(world, Notoriety, _options);
         StepRuns(world);
         RunAsked(world);
         if (double.IsNaN(_nextAssess)) _nextAssess = world.GameHours;
