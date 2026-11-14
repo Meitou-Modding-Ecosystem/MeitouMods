@@ -200,10 +200,47 @@ character loses its grudges across a save made before the rename.
 
 ## Debug rows (F10)
 
-`Rivalry: report` (characters, wealth, grudges, towns, last decision), `Rivalry: assess now`, `Rivalry: grudge on selected` (field:
-`faction name or id[, amount]`, default 100), `Rivalry: runs and rules`, `Rivalry: fire rule` (field: `rule[, target]`; skips conditions,
-chance and cooldown), `Rivalry: visit town` (field: `template id, faction[, hours[, town]]`). A town is given by name, number or key; left out:
-the first player town. The outcome is a `debug:` line in the game log.
+A row with a field takes its values separated by commas, in the order below; spaces round a value are dropped, so a name cannot hold a comma.
+`[x]` may be left out. The row's own status line only says what was queued; the outcome is a `debug:` line in the game log one tick later (so the game must not be paused), and
+`Rivalry: report` shows the latest line.
+
+| Row | Field | Does |
+| --- | --- | --- |
+| `Rivalry: report` | none | characters, wealth (money, carried, stored, built), grudges, each town's buildings, stored value, defence and threat, the latest log line |
+| `Rivalry: assess now` | none | runs the inspection, rules and directors at the next step instead of waiting for the period |
+| `Rivalry: runs and rules` | none | the behaviours under way (id, behaviour, town, platoon, phase, end hour) and every rule's name |
+| `Rivalry: grudge on selected` | `faction[, amount]` | adds `amount` to the faction's grudge against each selected character |
+| `Rivalry: fire rule` | `rule[, target]` | starts the rule's behaviour on one target, skipping its switch, conditions, chance and cooldown |
+| `Rivalry: visit town` | `template, faction[, hours[, town]]` | starts `rivalry.visit` (see "Visit") |
+
+| Value | Accepts | Left out |
+| --- | --- | --- |
+| `rule` | a rule's full name, exact case, as `Rivalry: runs and rules` lists it: `rivalry.reinforce`, `rivalry.opportunist`, and dependents' (`ashen.hand.thieves`, `ashen.hand.hunters`) | required |
+| `target` | for a town rule: the player town's name (any case), its number, or its key `town{number}`. For a character rule: the character's name, exact case; it must be standing | the rule's first target: the first player town, or the first standing character |
+| `faction` | a faction's name (any case) or record id | required; unknown: nothing happens (grudge) or the behaviour refuses (visit) |
+| `amount` | a number, `.` as decimal point; negative eases the grudge | 100 |
+| `template` | a SQUAD_TEMPLATE's record id (not its name) whose package is a wandering trader's | required |
+| `hours` | the stay in game hours | 48 |
+| `town` | as a town `target` | the first player town |
+
+Examples (a player town named `Home`, a character named `Beep`):
+
+| Row | Field | Expect in the log |
+| --- | --- | --- |
+| fire rule | `ashen.hand.thieves` | `debug: rule ashen.hand.thieves fired on town1`, then `ashen.hand.thieves: burgle: run 1 against town 1, ...` |
+| fire rule | `ashen.hand.thieves, Home` | the same, on that town |
+| fire rule | `ashen.hand.hunters, Beep` | `debug: rule ashen.hand.hunters fired on Beep`, then `ashen.hand.hunters: pursue: run 2 after Beep, ...` |
+| fire rule | `rivalry.opportunist, town1` | fired, then the raid's line; `no faction` unless a hostile faction has an assault campaign |
+| fire rule | `rivalry.reinforce` | fired, then the reinforce line; `no faction` unless the player has an ally (relation ≥ 50) |
+| grudge on selected | `The Ashen Hand, 100` | no log line; the next assessment sends its hunters (threshold 60); `assess now` brings it at once |
+| grudge on selected | `Dust Bandits` | +100; the grudge director then marks the character for that faction's nearby squads |
+| visit town | `<trader squad id>, Tech Hunters, 24, Home` | `debug: visit: run 3, <id> to town 1, ...` |
+
+What a `fire rule` line means: `no rule X` (misspelt, or its mod is not loaded); `rule X: no target K` (no such town or standing character;
+a town rule given a character, or the reverse); `rule X: no faction for K` (the rule's own faction pick found none: for The Ashen Hand,
+`AshenHand.mod` is missing or not enabled); `rule X threw: ...`. A rule fired this way does not start its cooldown. The behaviour's own line follows;
+`burgle: no population`, `no template` or `no town` are its refusals, and `waiting for a spot` means no walkable point was found yet in the
+ring round the town (tried again for 24 h). The record ids in a visit are the game's own, read in FCS; none is listed here.
 
 ## Building
 
