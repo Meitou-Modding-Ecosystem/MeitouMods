@@ -102,8 +102,11 @@ public static class Evidence
         if (parts.Length != 4 || parts[0] != TagPrefix) return null;
 
         var inv = CultureInfo.InvariantCulture;
-        bool read = uint.TryParse(parts[1], inv, out uint serial) & int.TryParse(parts[2], inv, out int bounty) & int.TryParse(parts[3], inv, out int crime);
-        return read && bounty > 0 ? (serial, bounty, (CrimeCode)crime) : null;
+        if (!uint.TryParse(parts[1], inv, out uint serial)) return null;
+        if (!int.TryParse(parts[2], inv, out int bounty) || bounty <= 0) return null;
+        if (!int.TryParse(parts[3], inv, out int crime)) return null;
+
+        return (serial, bounty, (CrimeCode)crime);
     }
 
     /// <summary>
