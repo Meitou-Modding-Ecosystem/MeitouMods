@@ -191,7 +191,7 @@ public class RivalryCoreTests
         var data = Data();
         var first = new Waiting();
         var (world, system, _) = Make(data, register: r => r.AddBehaviour(first));
-        world.Commands.Enqueue(new StartBehaviourCommand("test.wait", 1, "Friends", new BehaviourArgs().Set("hours", 500)) { Tick = 0 });
+        world.Commands.Enqueue(new StartBehaviourCommand("test.wait", null, "Friends", new BehaviourArgs().Set("hours", 500)) { Tick = 0 });
         world.RunTicks(2);
         Assert.Single(system.Runs);
 
@@ -262,7 +262,7 @@ public class RivalryCoreTests
             var me = Spawn(world, "Me", world.Player.Faction, TownAt);
             for (int i = 0; i < 70; i++) Spawn(world, "Foe" + i, foes, TownAt + new Vector3(10 * i, 0, 0));
             world.Commands.Enqueue(new GrudgeCommand([me], "Foes", 100) { Tick = 0 });
-            world.Commands.Enqueue(new StartBehaviourCommand("test.wait", 1, "Foes", new BehaviourArgs().Set("hours", 500)) { Tick = 1 });
+            world.Commands.Enqueue(new StartBehaviourCommand("test.wait", null, "Foes", new BehaviourArgs().Set("hours", 500)) { Tick = 1 });
             world.RunTicks(5);
             return world.StateHash();
         }
