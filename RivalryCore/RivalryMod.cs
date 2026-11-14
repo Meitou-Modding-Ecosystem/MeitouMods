@@ -84,7 +84,7 @@ public sealed class RivalryMod : IMod, IRivalryApi, IModDependents
         });
         c.AddDebugCommand("Rivalry: grudge on selected (faction[, amount])", d => QueueGrudge(d), hasField: true);
         c.AddDebugCommand("Rivalry: runs and rules", _ => DescribeRuns(_latest));
-        c.AddDebugCommand("Rivalry: fire rule (rule[, target key])", d => QueueRule(d), hasField: true);
+        c.AddDebugCommand("Rivalry: fire rule (rule[, town or character])", d => QueueRule(d), hasField: true);
         c.AddDebugCommand("Rivalry: visit town (template, faction[, hours[, town]])", d => QueueVisit(d), hasField: true);
     }
 
@@ -120,10 +120,10 @@ public sealed class RivalryMod : IMod, IRivalryApi, IModDependents
         if (parts.Length < 2 || parts[0].Length == 0) return "type a squad template id and a faction name";
 
         double hours = parts.Length > 2 && double.TryParse(parts[2], NumberStyles.Float, CultureInfo.InvariantCulture, out double h) ? h : 48;
-        int town = parts.Length > 3 && int.TryParse(parts[3], out int t) ? t : 1;
+        string? town = parts.Length > 3 && parts[3].Length > 0 ? parts[3] : null;
         var args = new BehaviourArgs().Set("template", parts[0]).Set("hours", hours);
         d.Enqueue(new StartBehaviourCommand(BuiltIn.Visit, town, parts[1], args) { Tick = d.Tick + 1 });
-        return $"visit of {parts[0]} to town {town} queued";
+        return $"visit of {parts[0]} to {town ?? "the first town"} queued";
     }
 
     static string QueueGrudge(DebugCommandContext d)

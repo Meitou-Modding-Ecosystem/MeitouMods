@@ -155,8 +155,9 @@ character loses its grudges across a save made before the rename.
 ## Debug rows (F10)
 
 `Rivalry: report` (characters, wealth, grudges, towns, last decision), `Rivalry: assess now`, `Rivalry: grudge on selected` (field:
-`faction name or id[, amount]`, default 100), `Rivalry: runs and rules`, `Rivalry: fire rule` (field: `rule[, target key]`; skips conditions,
-chance and cooldown), `Rivalry: visit town` (field: `template id, faction[, hours[, town]]`).
+`faction name or id[, amount]`, default 100), `Rivalry: runs and rules`, `Rivalry: fire rule` (field: `rule[, target]`; skips conditions,
+chance and cooldown), `Rivalry: visit town` (field: `template id, faction[, hours[, town]]`). A town is given by name, number or key; left out:
+the first player town. The outcome is a `debug:` line in the game log.
 
 ## Building
 

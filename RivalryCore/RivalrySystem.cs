@@ -1,3 +1,4 @@
+using System.Globalization;
 using Meitou.Modding;
 using Meitou.Simulation;
 using Meitou.Simulation.Combat;
@@ -14,9 +15,9 @@ public sealed record AssessNowCommand : SimCommand;
 public sealed record FireRuleCommand(string Rule, string? Key) : SimCommand;
 
 /// <summary>
-/// Starts a behaviour for a player town with a faction (its name or string id) acting (the debug rows).
+/// Starts a behaviour for a player town (its name, number or key; null: the first) with a faction (its name or string id) acting (the debug rows).
 /// </summary>
-public sealed record StartBehaviourCommand(string Behaviour, int Town, string Faction, BehaviourArgs Args) : SimCommand;
+public sealed record StartBehaviourCommand(string Behaviour, string? Town, string Faction, BehaviourArgs Args) : SimCommand;
 
 /// <summary>Adds to the grudge a faction (its name or string id) holds against characters (the debug row; dependents use <see cref="Decisions.Grudge"/>).</summary>
 public sealed record GrudgeCommand(IReadOnlyList<CharacterId> Characters, string Faction, float Amount) : SimCommand;
@@ -165,8 +166,8 @@ public sealed partial class RivalrySystem : ICombatHitObserver, IStateHashed, IM
         var decided = new List<Decision>();
         foreach (var command in _asked)
         {
-            if (command is FireRuleCommand fire) Remember($"debug: {_rules.Fire(NewAssessment(world), fire.Rule, fire.Key, decided, _cooldowns)}");
-            else if (command is StartBehaviourCommand start) decided.Add(AsDecision(start));
+            if (command is FireRuleCommand fire) Remember($"debug: {_rules.Fire(NewAssessment(world), fire.Rule, TownKey(fire.Key), decided, _cooldowns)}");
+            else if (command is StartBehaviourCommand start) Start(start, decided);
         }
 
         _asked.Clear();
@@ -174,12 +175,38 @@ public sealed partial class RivalrySystem : ICombatHitObserver, IStateHashed, IM
     }
 
     /// <summary>
-    /// A debug start as a decision.
+    /// A debug start as a decision, or a log line when the player has no such town.
     /// </summary>
-    StartDecision AsDecision(StartBehaviourCommand start)
+    void Start(StartBehaviourCommand start, List<Decision> decided)
     {
-        var target = new RuleTarget($"town{start.Town}") { Town = start.Town, Faction = FactionByName(start.Faction) };
-        return new StartDecision("debug", start.Behaviour, target, start.Args);
+        if (TownOf(start.Town) is not { } town)
+        {
+            Remember($"debug: {start.Behaviour}: no player town {start.Town}");
+            return;
+        }
+
+        var target = new RuleTarget($"town{town}") { Town = town, Faction = FactionByName(start.Faction) };
+        decided.Add(new StartDecision("debug", start.Behaviour, target, start.Args));
+    }
+
+    /// <summary>
+    /// A debug row's target key with a player town's name or number turned into its key (<c>town{number}</c>); any other text as typed.
+    /// </summary>
+    string? TownKey(string? key) => key is not null && TownOf(key) is { } town ? $"town{town}" : key;
+
+    /// <summary>
+    /// The number of the player town a debug row names: by key, number or name (case ignored); empty or null: the first; null when none matches.
+    /// </summary>
+    int? TownOf(string? text)
+    {
+        var towns = Report.Towns;
+        if (string.IsNullOrWhiteSpace(text)) return towns.Count > 0 ? towns[0].Number : null;
+
+        string name = text.Trim();
+        string number = name.StartsWith("town", StringComparison.OrdinalIgnoreCase) ? name[4..] : name;
+        var match = towns.FirstOrDefault(t => t.Number.ToString(CultureInfo.InvariantCulture) == number)
+            ?? towns.FirstOrDefault(t => string.Equals(t.Name, name, StringComparison.OrdinalIgnoreCase));
+        return match?.Number;
     }
 
     void Assess(World world)
