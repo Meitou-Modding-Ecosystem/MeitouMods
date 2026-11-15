@@ -1,0 +1,7 @@
+{
+  "profiles": {
+    "Play (engine + mods)": {
+      "commandName": "Project"
+    }
+  }
+}

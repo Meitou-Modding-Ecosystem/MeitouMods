@@ -1,0 +1,105 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    One-click play from Visual Studio (docs/play.md): building this project builds the engine and every mod in $(PlayConfiguration),
+    copies each mod into the game's mods folder, and its launch profile then runs the engine. Its own program only writes empty .mod files.
+  -->
+
+  <!-- Machine-local overrides (KenshiDir, KenshiModsDir, PlayConfiguration, PlayDeploy, PlayArguments); git-ignored. -->
+  <Import Project="../MeitouMods.user.props" Condition="Exists('../MeitouMods.user.props')" />
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>Play</RootNamespace>
+    <IsPackable>false</IsPackable>
+    <!-- Its real inputs are the other projects, so Visual Studio must always hand the build to MSBuild (which skips what is current). -->
+    <DisableFastUpToDateCheck>true</DisableFastUpToDateCheck>
+  </PropertyGroup>
+
+  <!-- Where to deploy and what to run. Debug engine builds throw in TaskStart.CheckStarts once a mod starts a task, so Release by default. -->
+  <PropertyGroup>
+    <PlayConfiguration Condition="'$(PlayConfiguration)' == ''">Release</PlayConfiguration>
+    <KenshiDir Condition="'$(KenshiDir)' == ''">$(KENSHI_PATH)</KenshiDir>
+    <KenshiDir Condition="'$(KenshiDir)' == ''">C:\Program Files (x86)\Steam\steamapps\common\Kenshi</KenshiDir>
+    <KenshiModsDir Condition="'$(KenshiModsDir)' == ''">$([MSBuild]::EnsureTrailingSlash('$(KenshiDir)'))mods</KenshiModsDir>
+    <KenshiModsDir>$([MSBuild]::EnsureTrailingSlash('$(KenshiModsDir)'))</KenshiModsDir>
+    <PlayDeploy Condition="'$(PlayDeploy)' == '' and Exists('$(KenshiModsDir)')">true</PlayDeploy>
+    <EngineOutputDir>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)../engine/src/Meitou.Game/bin/$(PlayConfiguration)/$(TargetFramework)/'))</EngineOutputDir>
+    <EngineExe>$(EngineOutputDir)MeitouClient</EngineExe>
+    <EngineExe Condition="$([MSBuild]::IsOSPlatform('Windows'))">$(EngineExe).exe</EngineExe>
+    <RunCommand>$(EngineExe)</RunCommand>
+    <RunArguments>$(PlayArguments)</RunArguments>
+    <RunWorkingDirectory>$(EngineOutputDir)</RunWorkingDirectory>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../engine/src/Meitou.Data/Meitou.Data.csproj" />
+  </ItemGroup>
+
+  <!--
+    What a play build builds, always in $(PlayConfiguration) whatever the solution's configuration. Referenced (not linked) so that restore and
+    Visual Studio's build order include them. A mod's ModName is its folder in the game's mods folder and its assembly's name;
+    GeneratedData marks one whose .mod is generated (below).
+  -->
+  <ItemDefinitionGroup>
+    <PlayReference>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+      <Private>false</Private>
+      <AdditionalProperties>Configuration=$(PlayConfiguration)</AdditionalProperties>
+    </PlayReference>
+    <PlayMod>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+      <Private>false</Private>
+      <AdditionalProperties>Configuration=$(PlayConfiguration)</AdditionalProperties>
+    </PlayMod>
+  </ItemDefinitionGroup>
+
+  <ItemGroup>
+    <PlayReference Include="../engine/src/Meitou.Game/Meitou.Game.csproj" />
+    <PlayReference Include="../AshenHand.Data/AshenHand.Data.csproj" />
+    <PlayMod Include="../RivalryCore/RivalryCore.csproj" ModName="RivalryCore" />
+    <PlayMod Include="../AshenHand/AshenHand.csproj" ModName="AshenHand" GeneratedData="true" />
+    <ProjectReference Include="@(PlayReference);@(PlayMod)" />
+  </ItemGroup>
+
+  <!-- Copies each mod's assembly, symbols and manifest; skipped (with a message) when the mods folder doesn't exist, as on CI. -->
+  <Target Name="PlayDeploy" AfterTargets="Build" DependsOnTargets="PlayModFiles" Condition="'$(PlayDeploy)' == 'true'">
+    <MakeDir Directories="@(PlayMod->'$(KenshiModsDir)%(ModName)')" />
+    <Copy SourceFiles="@(PlayModFile)" DestinationFiles="@(PlayModFile->'$(KenshiModsDir)%(ModName)/%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true" />
+    <Message Importance="high" Text="Deployed @(PlayMod->'%(ModName)', ', ') to $(KenshiModsDir)" />
+  </Target>
+
+  <Target Name="PlaySkipDeploy" AfterTargets="Build" Condition="'$(PlayDeploy)' != 'true'">
+    <Message Importance="high" Text="Mods not deployed: no folder $(KenshiModsDir) (set KenshiModsDir or KENSHI_PATH)." />
+  </Target>
+
+  <Target Name="PlayModFiles">
+    <ItemGroup>
+      <_PlayModOutput Include="@(PlayMod->'%(RootDir)%(Directory)bin/$(PlayConfiguration)/$(TargetFramework)/%(ModName)')" />
+      <PlayModFile Include="@(_PlayModOutput->'%(Identity).dll');@(_PlayModOutput->'%(Identity).pdb');@(_PlayModOutput->'%(RootDir)%(Directory)meitou.json')" />
+    </ItemGroup>
+  </Target>
+
+  <!-- Data files. The Ashen Hand's is generated from the installed game when missing or older than its generator. -->
+  <PropertyGroup>
+    <PlayDotnet>dotnet</PlayDotnet>
+    <PlayDotnet Condition="'$(DOTNET_HOST_PATH)' != ''">$(DOTNET_HOST_PATH)</PlayDotnet>
+    <AshenHandDataDir>$(MSBuildThisFileDirectory)../AshenHand.Data/bin/$(PlayConfiguration)/$(TargetFramework)/</AshenHandDataDir>
+  </PropertyGroup>
+
+  <Target Name="PlayAshenHandMod" AfterTargets="PlayDeploy" Condition="'$(PlayDeploy)' == 'true'"
+          Inputs="$(AshenHandDataDir)AshenHand.Data.dll;$(AshenHandDataDir)AshenHand.dll" Outputs="$(KenshiModsDir)AshenHand/AshenHand.mod">
+    <Exec ContinueOnError="true" Command="&quot;$(PlayDotnet)&quot; &quot;$(AshenHandDataDir)AshenHand.Data.dll&quot; &quot;$(KenshiDir)&quot; &quot;$(KenshiModsDir)AshenHand/AshenHand.mod&quot;" />
+  </Target>
+
+  <!-- Every other mod gets an empty .mod (the game needs one per mod folder), never replacing one that is there. -->
+  <Target Name="PlayEmptyMods" AfterTargets="PlayAshenHandMod" Condition="'$(PlayDeploy)' == 'true'">
+    <ItemGroup>
+      <_PlayMissingMod Include="@(PlayMod->'$(KenshiModsDir)%(ModName)/%(ModName).mod')"
+                       Condition="'%(PlayMod.GeneratedData)' != 'true' and !Exists('$(KenshiModsDir)%(ModName)/%(ModName).mod')" />
+    </ItemGroup>
+    <Exec Condition="'@(_PlayMissingMod)' != ''" Command="&quot;$(PlayDotnet)&quot; &quot;$(TargetPath)&quot; @(_PlayMissingMod->'&quot;%(FullPath)&quot;', ' ')" />
+  </Target>
+
+</Project>
