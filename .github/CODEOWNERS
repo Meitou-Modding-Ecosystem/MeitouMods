@@ -1,0 +1,24 @@
+# Owners must approve PRs touching their paths. Later lines win. Add a line per mod when it is created (folders, tests, data, docs).
+
+*                         @TheIvoryDisaster
+
+/RivalryCore/             @TheIvoryDisaster
+/RivalryCore.Tests/       @TheIvoryDisaster
+/docs/rivalry-core.md     @TheIvoryDisaster
+
+/AshenHand/               @TheIvoryDisaster
+/AshenHand.Data/          @TheIvoryDisaster
+/AshenHand.Tests/         @TheIvoryDisaster
+/docs/ashen-hand.md       @TheIvoryDisaster
+
+/Husbandry/               @TheIvoryDisaster
+/Husbandry.Data/          @TheIvoryDisaster
+/docs/husbandry.md        @TheIvoryDisaster
+
+# Shared build, CI and the engine pin: maintainers.
+/.github/                 @TheIvoryDisaster
+/engine                   @TheIvoryDisaster
+/.gitmodules              @TheIvoryDisaster
+/Directory.Build.props    @TheIvoryDisaster
+/MeitouMods.slnx          @TheIvoryDisaster
+/Play/                    @TheIvoryDisaster
