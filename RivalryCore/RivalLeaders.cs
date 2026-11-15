@@ -19,7 +19,8 @@ public static class RivalLeaders
     public const char ListSeparator = '|';
 
     /// <summary>
-    /// Gives the squad's leader (its first living member) a name from the faction's roster: a returning leader, or a new one from <c>leaderNames</c>.
+    /// Gives the squad's leader (its first living member) a name from the faction's roster: a returning leader, or a new one from <c>leaderNames</c>
+    /// (without that argument, under the name the character was made with).
     /// The character takes the name; the run keeps it and the character's portrait serial. Null when the squad has no leader.
     /// </summary>
     public static RivalLeader? Assign(BehaviourContext context, BehaviourRun run, Squad squad)
@@ -28,6 +29,7 @@ public static class RivalLeaders
         if (FactionId(context, run.Faction) is not { } faction || FirstLiving(world, squad) is not { PortraitSerial: { } serial } body) return null;
 
         var names = Split(run.Args.Text("leaderNames"));
+        if (names.Count == 0 && body.Name.Length > 0) names = [body.Name];   // no roster of names: the leader keeps the name it was made with
         var leader = context.Rivals.Pick(faction, names, context.Roll($"leader{run.Id}"), s => s != 0 && Find(world, s) is not null);
         body.Name = leader.Name;
         leader.Serial = serial;

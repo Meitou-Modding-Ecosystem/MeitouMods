@@ -43,6 +43,7 @@ public sealed class AshenHandMod : IMod
 
         var rivalry = c.Dependency<IRivalryApi>(RivalryMod.Id) ?? throw new InvalidOperationException("The Ashen Hand needs Rivalry Core.");
         rivalry.Options.Homes[AshenHandData.Faction] = Homes;
+        rivalry.Options.OwnHitSquads.Add(AshenHandData.Faction);
         Register(rivalry.For(c.Id), Settings);
         c.AddItemUse(AshenHandData.Ledger, Evidence.Use);
     }

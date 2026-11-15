@@ -183,11 +183,14 @@ public sealed partial class RivalrySystem : ICombatHitObserver, IStateHashed, IM
         if (faction < 0) return $"no faction {factionName}";
 
         var bases = FactionBases.Of(_data, faction, FactionBases.NamesFor(_data, faction, _settings, []));
-        if (bases.Count == 0) return $"{_data.Factions[faction].Name}: no base found; hit squads take {_settings.HuntTravelFallbackHours:0.#} h";
+        string squad = HitSquads.TemplateFor(_data, faction) is { } template
+            ? $"hit squad: {_data.Db.Find(template)?.Name} ({template})"
+            : "no squad of its own to send: no hit squads unless a mod gives it one";
+        if (bases.Count == 0) return $"{_data.Factions[faction].Name}: {squad}; no base found; hit squads take {_settings.HuntTravelFallbackHours:0.#} h";
 
         var at = Report.Characters.FirstOrDefault() is { } c ? new System.Numerics.Vector2(c.Position.X, c.Position.Z) : default;
         var nearest = bases.OrderBy(b => System.Numerics.Vector2.Distance(b.Position, at)).Select(b => b.Label).Distinct().Take(5);
-        return $"{_data.Factions[faction].Name}: {bases.Count} {bases[0].Source} bases; nearest: {string.Join(", ", nearest)}";
+        return $"{_data.Factions[faction].Name}: {squad}; {bases.Count} {bases[0].Source} bases; nearest: {string.Join(", ", nearest)}";
     }
 
     /// <summary>

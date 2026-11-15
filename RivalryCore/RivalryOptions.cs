@@ -17,6 +17,9 @@ public sealed class RivalryOptions
     [Setting("Grudges send hunters", Hint = "A faction that holds a large grudge against one of your characters sends squads after them.")]
     public bool Hunters { get; set; } = true;
 
+    [Setting("Any faction sends hit squads", Hint = "A faction with a large grudge sends one of its own squads from its base after the character.")]
+    public bool HitSquads { get; set; } = true;
+
     [Setting("Opportunist raids", Hint = "Hostile factions raid towns that look rich and poorly defended.")]
     public bool OpportunistRaids { get; set; } = true;
 
@@ -103,6 +106,17 @@ public sealed class RivalryOptions
     /// dependents in their <c>Initialize</c>.
     /// </summary>
     public Dictionary<string, string> Homes { get; } = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Game hours a faction waits after its last hit squad finished before the built-in rule sends another.
+    /// </summary>
+    public double HitSquadRestHours { get; set; } = 72;
+
+    /// <summary>
+    /// Factions (string ids) whose mod sends their hit squads with a rule of its own: the built-in rule leaves them alone. Set by dependents in
+    /// their <c>Initialize</c>.
+    /// </summary>
+    public HashSet<string> OwnHitSquads { get; } = new(StringComparer.Ordinal);
 
     public int HuntSquads { get; set; } = 1;
     public float HuntRadius { get; set; } = 20000;

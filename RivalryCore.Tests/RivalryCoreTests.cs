@@ -319,4 +319,37 @@ public class RivalryCoreTests
         Assert.StartsWith("no player character named 'Nobody'", system.Debug.DescribeCharacters("Nobody", []));
         Assert.StartsWith("Beep: notoriety 0", system.Debug.DescribeCharacters("Beep", []));
     }
+
+    [Fact]
+    public void Any_faction_with_a_squad_of_its_own_sends_a_hit_squad_for_its_grudge()
+    {
+        var raiders = Rec("80-a", FcsRecordType.Faction, "Raiders");
+        raiders.References["squads"] = [new FcsReference("81-a", 10, 0, 0), new FcsReference("82-a", 50, 0, 0), new FcsReference("83-a", 30, 0, 0)];
+        var caravan = Rec("82-a", FcsRecordType.SquadTemplate, "Raider caravan");
+        caravan.Bools["is trader"] = true;
+        var file = new FcsFile();
+        file.Records.AddRange([
+            Rec("204-gamedata.base", FcsRecordType.Faction, "Nameless"), Rec("61-a", FcsRecordType.Faction, "Foes"), raiders,
+            Rec("81-a", FcsRecordType.SquadTemplate, "Raider scouts"), caravan, Rec("83-a", FcsRecordType.SquadTemplate, "Raider warband")]);
+        var db = new GameDatabase();
+        db.Apply(file, "test.mod");
+        var data = PopulationData.Create(db, []);
+        var (world, system, _) = Make(data);
+        int withSquads = data.FactionIndex("80-a"), without = data.FactionIndex("61-a");
+        var me = Spawn(world, "Zimm", world.Player.Faction, TownAt);
+        world.RunTicks(2);
+
+        Assert.Equal("83-a", HitSquads.TemplateFor(data, withSquads));   // the heaviest that is not a trader
+        Assert.Null(HitSquads.TemplateFor(data, without));
+
+        system.Notoriety.Add(without, me, 100);
+        world.Commands.Enqueue(new AssessNowCommand { Tick = world.Tick });
+        world.RunTicks(2);
+        Assert.DoesNotContain(system.History, l => l.StartsWith(BuiltIn.HitSquadRule));   // a grudge, but no squad of its own to send
+
+        system.Notoriety.Add(withSquads, me, 100);
+        world.Commands.Enqueue(new AssessNowCommand { Tick = world.Tick });
+        world.RunTicks(2);
+        Assert.Contains(system.History, l => l.StartsWith(BuiltIn.HitSquadRule + ": pursue:"));
+    }
 }
