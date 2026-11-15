@@ -57,8 +57,10 @@
   <ItemGroup>
     <PlayReference Include="../engine/src/Meitou.Game/Meitou.Game.csproj" />
     <PlayReference Include="../AshenHand.Data/AshenHand.Data.csproj" />
+    <PlayReference Include="../Husbandry.Data/Husbandry.Data.csproj" />
     <PlayMod Include="../RivalryCore/RivalryCore.csproj" ModName="RivalryCore" />
     <PlayMod Include="../AshenHand/AshenHand.csproj" ModName="AshenHand" GeneratedData="true" />
+    <PlayMod Include="../Husbandry/Husbandry.csproj" ModName="Husbandry" GeneratedData="true" />
     <ProjectReference Include="@(PlayReference);@(PlayMod)" />
   </ItemGroup>
 
@@ -92,11 +94,12 @@
     </ItemGroup>
   </Target>
 
-  <!-- Data files. The Ashen Hand's is generated from the installed game when missing or older than its generator. -->
+  <!-- Data files. The Ashen Hand's and Husbandry's are generated from the installed game when missing or older than their generators. -->
   <PropertyGroup>
     <PlayDotnet>dotnet</PlayDotnet>
     <PlayDotnet Condition="'$(DOTNET_HOST_PATH)' != ''">$(DOTNET_HOST_PATH)</PlayDotnet>
     <AshenHandDataDir>$(MSBuildThisFileDirectory)../AshenHand.Data/bin/$(PlayConfiguration)/$(TargetFramework)/</AshenHandDataDir>
+    <HusbandryDataDir>$(MSBuildThisFileDirectory)../Husbandry.Data/bin/$(PlayConfiguration)/$(TargetFramework)/</HusbandryDataDir>
   </PropertyGroup>
 
   <Target Name="PlayAshenHandMod" AfterTargets="PlayDeploy" Condition="'$(PlayDeploy)' == 'true'"
@@ -104,8 +107,13 @@
     <Exec ContinueOnError="true" Command="&quot;$(PlayDotnet)&quot; &quot;$(AshenHandDataDir)AshenHand.Data.dll&quot; &quot;$(KenshiDir)&quot; &quot;$(KenshiModsDir)AshenHand/AshenHand.mod&quot;" />
   </Target>
 
+  <Target Name="PlayHusbandryMod" AfterTargets="PlayDeploy" Condition="'$(PlayDeploy)' == 'true'"
+          Inputs="$(HusbandryDataDir)Husbandry.Data.dll;$(HusbandryDataDir)Husbandry.dll" Outputs="$(KenshiModsDir)Husbandry/Husbandry.mod">
+    <Exec ContinueOnError="true" Command="&quot;$(PlayDotnet)&quot; &quot;$(HusbandryDataDir)Husbandry.Data.dll&quot; &quot;$(KenshiDir)&quot; &quot;$(KenshiModsDir)Husbandry/Husbandry.mod&quot;" />
+  </Target>
+
   <!-- Every other mod gets an empty .mod (the game needs one per mod folder), never replacing one that is there. -->
-  <Target Name="PlayEmptyMods" AfterTargets="PlayAshenHandMod" Condition="'$(PlayDeploy)' == 'true'">
+  <Target Name="PlayEmptyMods" AfterTargets="PlayAshenHandMod;PlayHusbandryMod" Condition="'$(PlayDeploy)' == 'true'">
     <ItemGroup>
       <_PlayMissingMod Include="@(PlayMod->'$(KenshiModsDir)%(ModName)/%(ModName).mod')"
                        Condition="'%(PlayMod.GeneratedData)' != 'true' and !Exists('$(KenshiModsDir)%(ModName)/%(ModName).mod')" />
