@@ -29,6 +29,11 @@ public static class BuiltIn
         Burgle = "rivalry.burgle", Pursue = "rivalry.pursue";
 
     /// <summary>
+    /// The rule that sends any faction's hit squad after a character it holds a grudge against.
+    /// </summary>
+    public const string HitSquadRule = "rivalry.hit-squad";
+
+    /// <summary>
     /// Registers the built-ins.
     /// </summary>
     internal static void Register(IRivalryRegistry r)
@@ -51,6 +56,7 @@ public static class BuiltIn
 
         r.AddRule(ReinforceRule());
         r.AddRule(OpportunistRule());
+        r.AddRule(HitSquad());
         r.AddDirector(new GrudgeDirector());
     }
 
@@ -73,6 +79,22 @@ public static class BuiltIn
             .DefaultIfEmpty(-1)
             .First(),
         Notice = (a, t) => $"{a.Faction(t.Faction)?.Name} answers the call to {a.Report.TownOf(t.Town)?.Name}",
+    };
+
+    /// <summary>
+    /// A faction whose grudge against a standing character has reached the hunt threshold sends one of its own squads from its base after them
+    /// (<see cref="HitSquads"/>): one squad per faction at a time, once per character per cooldown.
+    /// </summary>
+    static Rule HitSquad() => new()
+    {
+        Name = HitSquadRule,
+        Target = CharacterTarget,
+        Behaviour = Pursue,
+        Enabled = o => o.Hunters && o.HitSquads,
+        CooldownHours = o => o.HuntCooldownHours,
+        Faction = (a, t) => HitSquads.FactionFor(a, t.Character),
+        Args = (a, t) => new BehaviourArgs().Set("template", HitSquads.TemplateFor(a.Data, t.Faction) ?? "").Set("hours", a.Options.HuntHours),
+        Notice = (a, t) => $"{a.Faction(t.Faction)?.Name} has sent a hit squad for {t.Key}",
     };
 
     /// <summary>

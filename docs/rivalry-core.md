@@ -62,6 +62,7 @@ director and key.
 | behaviour | `rivalry.burgle`, `rivalry.pursue` | see "Burgle" and "Pursue": squads the mod walks itself |
 | rule | `rivalry.reinforce` | town `rivalry.losing`: `rivalry.reinforce` by the closest ally (relation ≥ 50; allies with a DEFEND_TOWN campaign first); once per town per 12 h |
 | rule | `rivalry.opportunist` | town `rivalry.tempting`, chance `RaidChancePerDay`: `rivalry.raid` by the most hostile faction that has an assault campaign; once per town per 96 h |
+| rule | `rivalry.hit-squad` | a standing character against whom a faction's grudge is ≥ `HuntThreshold`: `rivalry.pursue` with that faction's own squad (see "Hit squads of any faction"); once per character per 48 h |
 | director | `rivalry.grudge` | a non-allied faction's grudge on a standing character ≥ `HuntThreshold` (60): `Hunt` with `HuntSquads` squads; largest first, at most 2 per assessment, once per faction and character name per 48 h |
 
 ## Rules
@@ -262,17 +263,27 @@ A row with a field takes its values separated by commas, in the order below; spa
 `Rivalry: character`. A row refuses at once, in its status line, what cannot work (unknown rule or faction, a target of the wrong kind) and
 lists what would. The reading rows show a copy of the state made once a game second; their answer also goes to the game log, in full.
 
+### Hit squads of any faction
+
+`rivalry.hit-squad` (`HitSquads`; settings switch "Any faction sends hit squads", on): the faction that acts is the one with the largest
+grudge ≥ `HuntThreshold` against the character that is not the player's, not an ally, not in `RivalryOptions.OwnHitSquads` (factions whose
+mod sends theirs by its own rule: The Ashen Hand), has no hit squad out, whose last one finished ≥ `HitSquadRestHours` (72) ago, and has a
+squad to send: of the SQUAD_TEMPLATEs in its `squads` list, else its `squad default`, that are not traders, the one with the largest weight
+(ties by id). `Rivalry: faction bases` names that squad, or says the faction has none. The leader keeps the name it was made with. The grudge
+director still marks the faction's squads already near. **Unknown** in play: which squad each vanilla faction ends up sending, and how a
+vanilla patrol squad of full size behaves when driven as a hit squad.
+
 ### Two ways a character gets hunted
 
 | | Grudge hunt | Hit squad |
 | --- | --- | --- |
-| Who | any faction that is not an ally | only a faction a mod gave a hit squad rule: today The Ashen Hand (`ashen.hand.hunters`) |
-| Started by | the director `rivalry.grudge` at an assessment, when the faction's grudge is ≥ 60 | that rule at an assessment (grudge ≥ 60, no squad of the faction out, rested), or `fire rule` |
+| Who | any faction that is not an ally | any faction that is not an ally and has a roaming squad of its own (`rivalry.hit-squad`); The Ashen Hand by its own rule (`ashen.hand.hunters`) |
+| Started by | the director `rivalry.grudge` at an assessment, when the faction's grudge is ≥ 60 | the rule at an assessment (grudge ≥ 60, no squad of the faction out, rested 72 h), or `fire rule` |
 | What happens | the faction's squads **already in the world** within 20000 of the character hold them as an enemy and attack on sight. Nothing is spawned, nothing travels | a new squad travels from the faction's base, appears out of sight, closes in and attacks |
 | A run? | no: `runs and rules` stays empty | yes: one `rivalry.pursue` run |
 | How to see it | `Rivalry: character`: "N of its squads in the world hold them as an enemy", "marks again in X h"; `Rivalry: log`: `rivalry.grudge: hunt: Reavers sends N squad(s) after Zimm` (0: none was near) | `Rivalry: character`: "hit squads: The Ashen Hand run 3: travelling from its base, arrives in 5.2 h" |
 
-So a grudge from Reavers never makes a run, and `rivalry.grudge` cannot be fired: it is a director, not a rule. `rivalry.opportunist` and
+A grudge from Reavers now starts both. `rivalry.grudge` cannot be fired: it is a director, not a rule. `rivalry.opportunist` and
 `rivalry.reinforce` aim at a town (a raid on it, allies coming to it), never at a character, and make no run either: they queue a campaign.
 
 ### Rows
@@ -292,7 +303,7 @@ So a grudge from Reavers never makes a run, and `rivalry.grudge` cannot be fired
 
 | Value | Accepts | Left out |
 | --- | --- | --- |
-| `rule` | a rule's full name, exact case, as `runs and rules` lists it with its target kind: `rivalry.reinforce [a town]`, `rivalry.opportunist [a town]`, `ashen.hand.thieves [a town]`, `ashen.hand.hunters [a character]` | required |
+| `rule` | a rule's full name, exact case, as `runs and rules` lists it with its target kind: `rivalry.reinforce [a town]`, `rivalry.opportunist [a town]`, `rivalry.hit-squad [a character]`, `ashen.hand.thieves [a town]`, `ashen.hand.hunters [a character]` | required |
 | `target` | for a town rule: the player town's name (any case), its number, or `town{number}`. For a character rule: a standing player character's name, exact case | the rule's first target: the first player town, or the first standing character |
 | `name` | a player character's name, any case | the selected characters; none selected: everyone with a grudge or a hit squad |
 | `faction` | a faction's name as the game shows it (any case) or its record id | required |
@@ -328,7 +339,8 @@ closing in, gives up in X h`; `engaged, gives up in X h`; `beaten or called off;
 | To see | Do | Expect |
 | --- | --- | --- |
 | a grudge hunt | select Zimm; `grudge on selected`: `Reavers, 100`; unpause; `assess now`; unpause; `character` | `grudges: Reavers 100, N of its squads ...`; N is 0 when no Reaver squad is within 20000, and then nothing comes |
-| a hit squad now | `fire rule`: `ashen.hand.hunters, Zimm`; unpause; `character` | `hit squads: The Ashen Hand run 1: travelling ...` |
+| any faction's hit squad | select Zimm; `grudge on selected`: `Reavers, 100`; unpause; `fire rule`: `rivalry.hit-squad, Zimm` (or `assess now`); unpause; `character` | `hit squads: Reavers run 1: travelling from its base, arrives in ...`; `no faction for Zimm`: no faction with a grudge ≥ 60 has a squad to send (`faction bases`: `Reavers`) or it is resting |
+| The Ashen Hand's hit squad now | `fire rule`: `ashen.hand.hunters, Zimm`; unpause; `character` | `hit squads: The Ashen Hand run 1: travelling ...` |
 | a hit squad by its rule | select Zimm; `grudge on selected`: `The Ashen Hand, 100`; unpause; `assess now`; unpause; `character` | the same, plus `rules resting: ashen.hand.hunters 48 h` |
 | thieves now | `fire rule`: `ashen.hand.thieves` (or `ashen.hand.thieves, Home`) | `runs and rules`: `run 2 rivalry.burgle: The Ashen Hand -> town 1: ...` |
 | a raid on a town | `fire rule`: `rivalry.opportunist, Home` | `log`: `rivalry.opportunist: raid: <faction> queued <campaign> against town 1`; no run |
@@ -351,7 +363,7 @@ Tests: `dotnet test RivalryCore.Tests` (synthetic worlds, no game needed).
 
 **Verified** by `RivalryCore.Tests` (synthetic worlds without a population system): the reinforce rule and its nearby squad, a grudge's
 hunt, grudges and cooldowns across a save, a dependent's probe/condition/rule firing once per cooldown, a run across a save, a version 1 save
-loading, name prefixes and dropping a mod's pieces, the world hash on 1 and 4 threads, which races a faction buys (`SlaveMarket`), the debug rows' character report for a grudge and their refusal of a rule aimed at the wrong kind of target. Burgle and
+loading, name prefixes and dropping a mod's pieces, the world hash on 1 and 4 threads, which races a faction buys (`SlaveMarket`), the debug rows' character report for a grudge and their refusal of a rule aimed at the wrong kind of target, the hit squad rule firing for a faction with a roaming squad and not for one without. Burgle and
 Pursue have no test of their steps; nor do grudge cooling and floors, the rival roster, leader fates or the barks. **Unknown**: everything in a real game (campaign starts
 from `RequestCampaign`, contract packages, the Visit behaviour end to end, a run's platoon found again after a real load), and the
 `meitou-tools mod-check` result.
