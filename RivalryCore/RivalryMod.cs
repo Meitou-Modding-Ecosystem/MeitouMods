@@ -85,6 +85,7 @@ public sealed class RivalryMod : IMod, IRivalryApi, IModDependents
         c.AddDebugCommand("Rivalry: grudge on selected (faction[, amount])", d => QueueGrudge(d), hasField: true);
         c.AddDebugCommand("Rivalry: runs and rules", _ => DescribeRuns(_latest));
         c.AddDebugCommand("Rivalry: rival leaders", _ => DescribeRivals(_latest));
+        c.AddDebugCommand("Rivalry: faction bases (faction)", d => _latest?.DescribeBases(d.Field) ?? "no world yet", hasField: true);
         c.AddDebugCommand("Rivalry: fire rule (rule[, town or character])", d => QueueRule(d), hasField: true);
         c.AddDebugCommand("Rivalry: visit town (template, faction[, hours[, town]])", d => QueueVisit(d), hasField: true);
     }

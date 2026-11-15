@@ -73,7 +73,7 @@ public sealed class RivalryOptions
     public double HuntTravelUnitsPerHour { get; set; } = 25 * 1200.0 / 11;
 
     /// <summary>
-    /// The least travel time of a hit squad, and the travel time of one whose faction has no base found (no town and no <c>home</c> argument matched).
+    /// The least travel time of a hit squad, and the travel time of one whose faction has no base found (<see cref="FactionBases"/>).
     /// </summary>
     public double HuntTravelMinHours { get; set; } = 1;
     public double HuntTravelFallbackHours { get; set; } = 12;
@@ -96,6 +96,13 @@ public sealed class RivalryOptions
     /// it is held.
     /// </summary>
     public double AftermathHours { get; set; } = 12;
+
+    /// <summary>
+    /// Town or region (BIOME_GROUP) names a faction's squads set out from, by the faction's string id or name, entries separated by <c>|</c>: for a
+    /// faction whose own towns and squad lists say nothing (one that owns no town), or to override them (docs/factions.md "Bases"). Set by
+    /// dependents in their <c>Initialize</c>.
+    /// </summary>
+    public Dictionary<string, string> Homes { get; } = new(StringComparer.OrdinalIgnoreCase);
 
     public int HuntSquads { get; set; } = 1;
     public float HuntRadius { get; set; } = 20000;

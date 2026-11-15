@@ -7,7 +7,7 @@ namespace Rivalry;
 /// <summary>
 /// A hit squad comes for one character (docs/rivalry-core.md "Pursue"): it travels from its faction's nearest base, appears off screen, walks to wherever
 /// the quarry is now and attacks; once beaten its named leader is watched for its fate (<see cref="RivalLeaders"/>). Texts: <c>template</c> (a
-/// SQUAD_TEMPLATE), <c>home</c> (town names separated by <c>|</c>: the base of a faction that owns no town), <c>leaderNames</c>, lines
+/// SQUAD_TEMPLATE), <c>home</c> (town or region names separated by <c>|</c>, see <see cref="FactionBases"/>), <c>leaderNames</c>, lines
 /// (<see cref="HunterLines"/>). Numbers: <c>hours</c> of the chase (24), <c>minRadius</c>/<c>maxRadius</c> (the options' spawn ring), and skill ranges
 /// (<see cref="SquadDriver.RollSkills"/>). The run keeps <c>quarryName</c>, <c>travelHours</c>, <c>ended</c> and the leader's name and serial.
 /// </summary>
@@ -173,7 +173,7 @@ public sealed class PursueBehaviour : IBehaviour
         .First();
 
     /// <summary>
-    /// Phase 0: spawns the platoon in the ring round the quarry (beyond sight, inside the loaded zones) and holds it.
+    /// Phase 0: spawns the platoon in the ring round the quarry (beyond sight, inside the loaded zones), homed at its faction's base, and holds it.
     /// </summary>
     bool Spawn(BehaviourContext context, BehaviourRun run)
     {
@@ -182,7 +182,7 @@ public sealed class PursueBehaviour : IBehaviour
 
         var position = world.Characters.Next[quarry.Slot].Position;
         var at = new Vector2(position.X, position.Z);
-        int site = VisitBehaviour.NearestSite(context.Data, at);
+        int site = HomeSite(context, run, at);
         float min = (float)run.Args.Number("minRadius", context.Options.HuntSpawnMinRadius);
         float max = (float)run.Args.Number("maxRadius", context.Options.HuntSpawnMaxRadius);
         int platoon = site < 0 ? -1 : population.SpawnPlatoon(world, run.Faction, run.Args.Text("template")!, site, at, min, max);
@@ -194,6 +194,12 @@ public sealed class PursueBehaviour : IBehaviour
         run.Until = world.GameHours + LoadWindowHours;
         return true;
     }
+
+    /// <summary>
+    /// The town the squad belongs to (where it heads once given back): its faction's nearest base town, else the town nearest the quarry.
+    /// </summary>
+    static int HomeSite(BehaviourContext context, BehaviourRun run, Vector2 at) =>
+        Travel.Base(context, run.Faction, at, run.Args) is { Site: >= 0 } home ? home.Site : VisitBehaviour.NearestSite(context.Data, at);
 
     /// <summary>
     /// Phase 1: once the squad is in the world it is taken from the AI and remembers its quarry as an enemy; its leader is named from the roster
@@ -317,9 +323,9 @@ public sealed class PursueBehaviour : IBehaviour
 }
 
 /// <summary>
-/// How long a hit squad is on the road (docs/rivalry-core.md "Pursue"): the distance from its faction's nearest base to the quarry over
-/// <see cref="RivalryOptions.HuntTravelUnitsPerHour"/>, between the least and most travel time. The base: the nearest town the faction owns, else the
-/// nearest town the run's <c>home</c> argument names; with neither, <see cref="RivalryOptions.HuntTravelFallbackHours"/>.
+/// How long a hit squad is on the road (docs/rivalry-core.md "Pursue"): the distance from its faction's nearest base (<see cref="FactionBases"/>) to the
+/// quarry over <see cref="RivalryOptions.HuntTravelUnitsPerHour"/>, between the least and most travel time; with no base,
+/// <see cref="RivalryOptions.HuntTravelFallbackHours"/>.
 /// </summary>
 public static class Travel
 {
@@ -329,25 +335,18 @@ public static class Travel
     public static double Hours(BehaviourContext context, int faction, Vector2 to, BehaviourArgs args)
     {
         var options = context.Options;
-        if (Base(context.Data, faction, to, RivalLeaders.Split(args.Text("home"))) is not { } from)
-            return Math.Min(options.HuntTravelFallbackHours, options.HuntTravelMaxHours);
+        if (Base(context, faction, to, args) is not { } from) return Math.Min(options.HuntTravelFallbackHours, options.HuntTravelMaxHours);
 
-        double hours = Vector2.Distance(from, to) / Math.Max(1, options.HuntTravelUnitsPerHour);
+        double hours = Vector2.Distance(from.Position, to) / Math.Max(1, options.HuntTravelUnitsPerHour);
         return Math.Clamp(hours, Math.Min(options.HuntTravelMinHours, options.HuntTravelMaxHours), options.HuntTravelMaxHours);
     }
 
     /// <summary>
-    /// The faction's nearest base to a point; null when it owns no town and none of <paramref name="home"/> is found.
+    /// The faction's base nearest a point, with the run's <c>home</c> names and <see cref="RivalryOptions.Homes"/>; null when it has none.
     /// </summary>
-    public static Vector2? Base(PopulationData data, int faction, Vector2 to, IReadOnlyList<string> home)
+    public static FactionBase? Base(BehaviourContext context, int faction, Vector2 to, BehaviourArgs args)
     {
-        var owned = data.Sites.Where(s => s.Index < data.SiteFactions.Count && data.SiteFactions[s.Index] == faction);
-        var named = data.Sites.Where(s => home.Any(h => string.Equals(h, s.Town.Name, StringComparison.OrdinalIgnoreCase)));
-        var sites = owned.Any() ? owned : named;
-        return sites
-            .Select(s => new Vector2(s.Position.X, s.Position.Z))
-            .OrderBy(p => Vector2.DistanceSquared(p, to))
-            .Cast<Vector2?>()
-            .FirstOrDefault();
+        var names = FactionBases.NamesFor(context.Data, faction, context.Options, RivalLeaders.Split(args.Text("home")));
+        return FactionBases.Nearest(context.Data, faction, names, to);
     }
 }
