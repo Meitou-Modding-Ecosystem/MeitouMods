@@ -41,6 +41,8 @@ git submodule update --init --recursive
 
 ## Branches and releases
 
+How to contribute, add a mod and who owns what: [CONTRIBUTING.md](CONTRIBUTING.md).
+
 - Work goes in PRs to `beta`; CI (build and tests) must pass. `beta` is merged into `main` once it has been tested in play.
 - A mod is released by pushing a tag `<mod-slug>-v<version>` on `main` (e.g. `rivalry-core-v0.2.0`; slugs in
   `.github/workflows/release.yml`). CI builds that mod and publishes `<Mod>-<version>.zip`, holding the folder to drop into `Kenshi/mods/`.
