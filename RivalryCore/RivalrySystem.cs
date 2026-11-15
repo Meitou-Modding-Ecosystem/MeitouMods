@@ -65,7 +65,7 @@ public sealed partial class RivalrySystem : ICombatHitObserver, IStateHashed, IM
         _catalogue = new Catalogue(_data, _population);
         var memory = context.Find<DialogueSystem>()?.Memory;
         _actions = new Actions(_data, _population, memory, Notoriety, _catalogue);
-        _barks = new HunterBarks(context.Find<CombatSystem>(), memory);
+        _barks = new HunterBarks(context.Find<CombatSystem>());
         _rules = new RuleEngine(registry, log);
         _runs = new BehaviourRuns(_data, registry.Behaviours.ToDictionary(e => e.Name, e => e.Value, StringComparer.Ordinal), log);
     }
@@ -85,6 +85,11 @@ public sealed partial class RivalrySystem : ICombatHitObserver, IStateHashed, IM
 
     public PlayerReport Report { get; private set; } = PlayerReport.Empty;
     public NotorietyLedger Notoriety { get; } = new();
+
+    /// <summary>
+    /// The named leaders of hit squads, the leaders handed to the law, and each faction's last hit squad.
+    /// </summary>
+    public RivalRoster Rivals { get; } = new();
 
     /// <summary>A copy, safe to read from the host's thread.</summary>
     public IReadOnlyList<string> History { get; private set; } = [];
@@ -115,8 +120,8 @@ public sealed partial class RivalrySystem : ICombatHitObserver, IStateHashed, IM
         _world = world;
         ResolveSaved(world);
         CheckKills(world);
-        _barks.Step(world, Notoriety, _options);
         StepRuns(world);
+        _barks.Step(world, _runs.All, Rivals, _options);
         RunAsked(world);
         if (double.IsNaN(_nextAssess)) _nextAssess = world.GameHours;
         if (!_assessNow && world.GameHours < _nextAssess) return;
@@ -146,7 +151,17 @@ public sealed partial class RivalrySystem : ICombatHitObserver, IStateHashed, IM
     void StepRuns(World world)
     {
         if (_runs.All.Count > 0) _runs.Step(Context(world));
+        Rivals.Idle(_runs.All.Where(r => r.Args.Text("leaderName") is not null).Select(LeaderOf));
         PublishRuns();
+    }
+
+    /// <summary>
+    /// The faction and leader a run names, for <see cref="RivalRoster.Idle"/>.
+    /// </summary>
+    (string Faction, string Name) LeaderOf(BehaviourRun run)
+    {
+        string faction = run.Faction >= 0 && run.Faction < _data.Factions.Count ? _data.Factions[run.Faction].Id : "";
+        return (faction, run.Args.Text("leaderName")!);
     }
 
     /// <summary>
@@ -218,7 +233,7 @@ public sealed partial class RivalrySystem : ICombatHitObserver, IStateHashed, IM
         double hours = double.IsNaN(_lastAssess) ? 0 : world.GameHours - _lastAssess;
         _lastAssess = world.GameHours;
         _nextAssess = world.GameHours + Math.Max(1, _options.AssessEveryHours);
-        Notoriety.Decay(world.Characters, hours, _options.GrudgeHalfLifeDays * 24);
+        Notoriety.Cool(world.Characters, hours, _options.GrudgeCoolPerHour);
         _cooldowns.Expire(world.GameHours);
         Report = _inspector.Inspect(world);
         if (Report.PlayerFaction < 0) return;
@@ -227,9 +242,10 @@ public sealed partial class RivalrySystem : ICombatHitObserver, IStateHashed, IM
         foreach (var decision in decided) Carry(world, decision);
     }
 
-    Assessment NewAssessment(World world) => new(world, _data, Report, Notoriety, _options, _purpose, _catalogue);
+    Assessment NewAssessment(World world) => new(world, _data, Report, Notoriety, _options, _purpose, _catalogue, Rivals, _runs.All);
 
-    BehaviourContext Context(World world) => new(world, _data, Report, _options, _purpose, _actions, _runs, _population, _inspector, Notoriety);
+    BehaviourContext Context(World world) =>
+        new(world, _data, Report, _options, _purpose, _actions, _runs, _population, _inspector, Notoriety, Rivals);
 
     List<Decision> Decide(World world)
     {
@@ -285,5 +301,6 @@ public sealed partial class RivalrySystem : ICombatHitObserver, IStateHashed, IM
         h.Add(_faulted.Count + _rules.Faulted);
         HashVictims(ref h);
         _runs.Hash(ref h);
+        Rivals.Hash(ref h);
     }
 }

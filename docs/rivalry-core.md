@@ -1,6 +1,6 @@
 # Rivalry Core (framework mod)
 
-**Status: proposed, mod version 0.2.0, code-mod API 2.** A code mod in `RivalryCore` (id `rivalry.core`) that lets the world's factions
+**Status: proposed, mod version 0.5.0, code-mod API 2.** A code mod in `RivalryCore` (id `rivalry.core`) that lets the world's factions
 inspect the player's setup and act on it: hunt a character, raid a weak rich town, reinforce a town that is losing a fight. Not rival-only: the
 same pipeline sends allies to help and friendly visitors. Built on [dependencies](https://github.com/TheIvoryDisaster/MeitouClient/blob/master/docs/modding-dependencies.md); other mods add probes, conditions,
 target kinds, behaviours, rules and directors (see "Extension API"). Needs the engine hooks of [modding](https://github.com/TheIvoryDisaster/MeitouClient/blob/master/docs/modding.md) "World hooks".
@@ -36,8 +36,13 @@ without a base): the record's `value` field alone gave wealth 0. `rivalry.tempti
 
 `NotorietyLedger`: grudge per (faction, character). Fed by `ICombatHitObserver`: a player-faction attacker landing a hit on another faction's
 member adds `HitGrudge` (1), plus `DownedHitGrudge` (3) if the victim was already down; the victim dying within `KillWindowHours` (1) adds
-`KillGrudge` (25). Halves every `GrudgeHalfLifeDays` (4); below 0.5 or once the character leaves the table it is dropped. Directors and dialogue
-add to it too. A character's notoriety is the sum over factions.
+`KillGrudge` (25). At each assessment every grudge cools by `GrudgeCoolPerHour` (1) per game hour since the last; below 0.5 or once the
+character leaves the table it is dropped. Directors and dialogue add to it too. A character's notoriety is the sum over factions.
+
+**Held floor**: when a hit squad (`rivalry.pursue`) starts for a grudge at or above `HuntThreshold`, the threshold becomes that grudge's floor:
+cooling and negative adds stop there. It is let go when the squad is beaten (every member down or dead) while a standing player character is
+within `SeenRange` (1500, the outdoor sight range) of a member; a leader handed to the law clears the faction's grudges and floors outright
+(see "Rival leaders"). So a grudge that sent a squad keeps sending one, paced by the sender's rules, until the player beats it in view.
 
 ## Built-ins
 
@@ -109,11 +114,40 @@ unload (the carrier and captive then travel as a stand-in or not at all), and wh
 
 ### Pursue
 
-`rivalry.pursue` (target: a character; args: text `template`; numbers `hours` 24, `minRadius` 800, `maxRadius` 1500, skill ranges): spawns
-in the ring round the quarry, holds the platoon, marks the quarry TEMP_ENEMY for the squad (so [hunter barks](#hunter-barks) apply), runs to
-where the quarry is now at every step, and within 150 orders its idle members to attack. Ends, giving the squad back, when the quarry is down or
-gone, no hunter can act or `hours` are up. The quarry is not saved: after a load the run takes the standing player character its faction
-holds the largest grudge against. Needs no AI_PACKAGE. **Unknown** in play.
+`rivalry.pursue` (target: a character; args: text `template`, `home`, `leaderNames`, lines (see "Hunter barks"); numbers `hours` 24,
+`minRadius`/`maxRadius` (`HuntSpawnMinRadius` 2200, `HuntSpawnMaxRadius` 3400), skill ranges). Phases:
+
+1. **Travelling** (5): on the road for the distance from the faction's nearest base to the quarry over `HuntTravelUnitsPerHour` (2727: the
+   original's off-screen travel speed 25 per second over its 1200/11 s game hour), clamped to `HuntTravelMinHours` (1) and the setting
+   `HuntTravelMaxHours` (48; 0 skips the road). Base: the nearest town the faction owns, else the nearest town named in `home` (`|`-separated,
+   any case), else `HuntTravelFallbackHours` (12).
+2. **Spawning** (0): `SpawnPlatoon` in the ring round the quarry, beyond sight (1500 × vision) and inside the loaded 3 × 3 zones (4608 each),
+   tried for 24 h; then **loading** (1): once in the world the squad is held, its skills rolled, its leader named (see "Rival leaders"), its
+   evidence planted, and the quarry marked TEMP_ENEMY.
+3. **Closing / attacking** (2, 3): runs to the quarry's current position at every step; within 150 its idle members are ordered to attack.
+4. Settled: quarry down or gone (won), every hunter down (beaten) or `hours` up (broke off). The squad is given back, the faction's last hit
+   squad counts as finished now (`RivalRoster.Ended`), the leader is credited. Beaten in view releases the held floor; a beaten squad's leader
+   is then watched (**aftermath**, 4) for its fate.
+
+The run keeps `quarryName` (a loaded run finds the quarry by it, else the standing character with the largest grudge), `travelHours`,
+`ended`, `leaderName`, `leaderSerial`. `PursueBehaviour.Underway(run)`: not yet in its aftermath; `Assessment.HitSquadUnderway(faction)` and
+`HoursSinceHitSquad(faction)` let a rule send one squad at a time with a rest between. **Unknown** in play.
+
+### Rival leaders
+
+`RivalRoster` (`IRivalryState.Rivals`, `BehaviourContext.Rivals`, `Assessment.Rivals`; saved, hashed; factions by string id):
+
+- **Naming**: when a pursue squad loads, its first living member takes a leader's name: the faction's free, idle leader that fought most
+  recently and whose last body is not standing in the world, else a new name from `leaderNames` (picked by roll; the next unused; all used:
+  numbered, e.g. "Old Sorrow II"). The leader's portrait serial ties the roster entry to the body.
+- **Record** (`RivalLeader`): dispatches, wins, losses, withdrawals, left for dead, captures, escapes, comrades lost (squad members dead when a
+  fight is settled; total and last), last outcome, quarry and hour, fate (free, captive, dead, jailed, recruited). Only a free leader is sent.
+- **Aftermath** (a beaten squad's leader, looked at every 30 ticks): dead: killed. In a cage of a faction neither the player's nor lawless, or
+  a bounty on it claimed, alive: **handed to the law**: the faction forgets every grudge and floor (`NotorietyLedger.ClearFaction`) and a
+  `Reckoning` (faction, leader, quarry, hour, grudge cleared) is kept. Carried by a player character or in the player's cage: captive, watched
+  while held; free again: escaped. Gone from the world (its platoon unloaded) or still free after `AftermathHours` (12): left for dead.
+  Joined the player's faction: recruited.
+- Personality on redispatch and recruitment are planned on top of this record ([roadmap](roadmap.md)).
 
 ### Evidence
 
@@ -183,11 +217,20 @@ public void Initialize(ModContext c)
 
 ## Hunter barks
 
-A hunting squad is one of a faction with a grudge at `HuntThreshold` against a player character whose squad memory holds TEMP_ENEMY on that
-character (what `Hunt` sets; the tag fades 6 game hours after its last write, so the hunt and its barks end with it). Every 15 ticks the system
-reads each member's combat target (`CombatSystem.TargetOf`); a member that has just turned on anyone but its quarry says `OffTargetLine`
-(`{target}` = the quarry's name) through `World.Bark`, at most one member per squad per `BarkCooldownSeconds` (30). Switch: "Hunters speak".
-Display only: the bark state is not hashed or saved.
+`HunterBarks` watches the squads of pursue runs that are closing in or attacking, every 15 ticks, reading each member's combat target
+(`CombatSystem.TargetOf`) while the member is in combat and the target is standing:
+
+- A member that turns on someone not of the player's faction says a **distracted** line, at most one per squad per `BarkCooldownSeconds`
+  (30): the squad is held up by another fight.
+- The squad's first blow against one of the player's characters: its leader (if it can stand) opens with a line from its record: back after
+  a fight, the last outcome's list; new while its faction has a reckoning, the reckoning list; else its first words. A member speaks the
+  engage list when the leader cannot. Once per run.
+
+Lines come from the run's text args (`HunterLines`: `say.distracted`, `say.engage`, `say.first`, `say.reckoning`, `say.won`, `say.withdrew`,
+`say.beaten`, `say.leftForDead`, `say.escaped`; entries `|`-separated, one picked per bark), with generic defaults (`OffTargetLine` for
+distracted). Placeholders: `{target}` the quarry, `{name}` the speaker, `{leader}` the faction's last leader handed to the law, `{fallen}` the
+squad members dead after the leader's last fight. Switch: "Hunters speak". Display only: not hashed or saved. Squads the `rivalry.grudge`
+director marks (no run) do not speak.
 
 ## Dialogue codes
 
@@ -199,15 +242,16 @@ Display only: the bark state is not hashed or saved.
 
 ## Options
 
-The switches, assessment period, half-life, hunt threshold, reinforce balance, raid chance and `Announce` (a message per decision) are on the Mod
-settings page. Everything else in `RivalryOptions` is for dependents. The system copies the options in `Inputs` each tick.
+The switches, assessment period, grudge cooling per hour, hunt threshold, hit squad travel at most, reinforce balance, raid chance and
+`Announce` (a message per decision) are on the Mod settings page. Everything else in `RivalryOptions` is for dependents. The system copies the options in `Inputs` each tick.
 
 ## Save data
 
-Sidecar system `rivalry`, version 2 (version 1 still loads): next/last assessment hours, grudges by faction string id and character name +
+Sidecar system `rivalry`, version 3 (1 and 2 still load): next/last assessment hours, grudges by faction string id and character name +
 record id (slots change on load; restored to the first living match in slot order at the first step after the load, unmatched ones dropped),
 cooldowns; since version 2 the next run id and each run (faction by string id, args, and its platoon as template + position: platoon ids change
-on load, so a loaded run takes the nearest platoon of that template and faction no other run holds). Kill watches are not saved. A renamed
+on load, so a loaded run takes the nearest platoon of that template and faction no other run holds); since version 3 each grudge's held floor
+and, last, the rival roster (its own layout version 1: leaders, reckonings, each faction's last hit squad hour). Kill watches are not saved. A renamed
 character loses its grudges across a save made before the rename.
 
 ## Debug rows (F10)
@@ -221,6 +265,7 @@ A row with a field takes its values separated by commas, in the order below; spa
 | `Rivalry: report` | none | characters, wealth (money, carried, stored, built), grudges, each town's buildings, stored value, defence and threat, the latest log line |
 | `Rivalry: assess now` | none | runs the inspection, rules and directors at the next step instead of waiting for the period |
 | `Rivalry: runs and rules` | none | the behaviours under way (id, behaviour, town, platoon, phase, end hour) and every rule's name |
+| `Rivalry: rival leaders` | none | each named leader's record and fate, and the leaders handed to the law |
 | `Rivalry: grudge on selected` | `faction[, amount]` | adds `amount` to the faction's grudge against each selected character |
 | `Rivalry: fire rule` | `rule[, target]` | starts the rule's behaviour on one target, skipping its switch, conditions, chance and cooldown |
 | `Rivalry: visit town` | `template, faction[, hours[, town]]` | starts `rivalry.visit` (see "Visit") |
@@ -265,6 +310,6 @@ Tests: `dotnet test RivalryCore.Tests` (synthetic worlds, no game needed).
 **Verified** by `RivalryCore.Tests` (synthetic worlds without a population system): the reinforce rule and its nearby squad, a grudge's
 hunt, grudges and cooldowns across a save, a dependent's probe/condition/rule firing once per cooldown, a run across a save, a version 1 save
 loading, name prefixes and dropping a mod's pieces, the world hash on 1 and 4 threads, which races a faction buys (`SlaveMarket`). Burgle and
-Pursue have no test of their steps. **Unknown**: everything in a real game (campaign starts
+Pursue have no test of their steps; nor do grudge cooling and floors, the rival roster, leader fates or the barks. **Unknown**: everything in a real game (campaign starts
 from `RequestCampaign`, contract packages, the Visit behaviour end to end, a run's platoon found again after a real load), and the
 `meitou-tools mod-check` result.

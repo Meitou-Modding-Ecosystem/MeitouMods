@@ -3,11 +3,13 @@ using Meitou.Simulation;
 namespace Rivalry;
 
 /// <summary>
-/// Hunters speak (docs/rivalry-core.md "Hunter barks"): a member of a hunting squad that starts a fight with anyone but its quarry says
-/// <see cref="RivalryOptions.OffTargetLine"/> over its head. Display only: the line goes through <see cref="World.Bark"/>, and this class's state
-/// (whom each member last fought, when each squad last spoke) is neither hashed nor saved, as nothing the simulation does depends on it.
+/// Hit squads speak (docs/rivalry-core.md "Hunter barks"): a member of a pursuing squad (<see cref="BuiltIn.Pursue"/>, closing in or attacking) that starts
+/// a fight with someone who is not the player's says a "distracted" line, so the player sees why the squad is held up; when the squad first comes to
+/// blows with one of the player's characters, its named leader (or the member, if the leader cannot) speaks: of its last fight, of a predecessor handed
+/// to the law, or its first words (<see cref="HunterLines"/>). Display only: lines go through <see cref="World.Bark"/>, and this class's state is neither
+/// hashed nor saved, as nothing the simulation does depends on it.
 /// </summary>
-internal sealed class HunterBarks(CombatSystem? combat, SquadMemory? memory)
+internal sealed class HunterBarks(CombatSystem? combat)
 {
     /// <summary>
     /// Ticks between looks at the hunters' fights (half a second at 30 ticks a second).
@@ -25,91 +27,167 @@ internal sealed class HunterBarks(CombatSystem? combat, SquadMemory? memory)
     readonly Dictionary<CharacterId, CharacterId> _foes = [];
 
     /// <summary>
-    /// The tick each squad last spoke, for <see cref="RivalryOptions.BarkCooldownSeconds"/>.
+    /// The tick each run's squad last spoke, for <see cref="RivalryOptions.BarkCooldownSeconds"/>.
     /// </summary>
     readonly Dictionary<int, long> _spokeAt = [];
 
     /// <summary>
-    /// One look at the hunting squads' fights (a serial step). A hunting squad is one of a faction whose grudge against a player character is at
-    /// least <see cref="RivalryOptions.HuntThreshold"/> and that holds its TEMP_ENEMY tag on that character, which is what a hunt sets.
+    /// The runs whose squad has come to blows with the player and said so.
     /// </summary>
-    public void Step(World world, NotorietyLedger ledger, RivalryOptions options)
+    readonly HashSet<int> _engaged = [];
+
+    /// <summary>
+    /// One look at the pursuing squads' fights (a serial step).
+    /// </summary>
+    public void Step(World world, IReadOnlyList<BehaviourRun> runs, RivalRoster rivals, RivalryOptions options)
     {
-        if (!options.HunterBarks || combat is null || memory is null || world.Tick % CheckEveryTicks != 0) return;
+        if (!options.HunterBarks || combat is null || world.Tick % CheckEveryTicks != 0) return;
 
-        var hunted = Hunted(ledger, options);
-        if (hunted.Count == 0) return;
-
-        foreach (var squad in world.Squads.All)
+        foreach (var run in runs)
         {
-            if (squad.Dead || squad.Faction == world.Player.Faction || !hunted.TryGetValue(squad.Faction, out var marks)) continue;
-            if (!memory.AnyTempEnemy(squad.Id) || Quarry(world, squad, marks) is not { } quarry) continue;
+            if (run.Behaviour != BuiltIn.Pursue || run.Phase is not (PursueBehaviour.Closing or PursueBehaviour.Attacking)) continue;
+            if (SquadDriver.SquadOf(world, run.Platoon) is not { } squad) continue;
 
-            Watch(world, squad, quarry, options);
+            Watch(world, run, squad, rivals, options);
         }
 
-        Prune(world);
+        Prune(world, runs);
     }
 
     /// <summary>
-    /// Per faction, the characters it holds a hunting grudge against, largest grudge first.
+    /// Each fighting member's new foe: the player's, the squad's opening words once; anyone else, a distracted line at most once per cooldown.
     /// </summary>
-    static Dictionary<int, List<CharacterId>> Hunted(NotorietyLedger ledger, RivalryOptions options) =>
-        ledger.Entries
-            .Where(g => g.Value >= options.HuntThreshold)
-            .OrderByDescending(g => g.Value)
-            .ThenBy(g => g.Key)
-            .GroupBy(g => g.Key.Faction)
-            .ToDictionary(g => g.Key, g => g.Select(e => e.Key.Who).ToList());
+    void Watch(World world, BehaviourRun run, Squad squad, RivalRoster rivals, RivalryOptions options)
+    {
+        foreach (var member in squad.Members)
+        {
+            if (NewFoe(world, member) is not { } foe) continue;
+
+            if (IsPlayers(world, foe)) Engage(world, run, squad, member, rivals);
+            else if (MaySpeak(world, run.Id, options)) Say(world, run, member, Line(world, run, member, HunterLines.Distracted, rivals, options));
+        }
+    }
 
     /// <summary>
-    /// The squad's quarry: the first of its faction's hunted characters it holds TEMP_ENEMY and who is still in the world.
+    /// The squad's first blow against the player: the leader speaks from its record when it can, else the member says an engage line.
     /// </summary>
-    CharacterId? Quarry(World world, Squad squad, List<CharacterId> marks)
+    void Engage(World world, BehaviourRun run, Squad squad, CharacterId member, RivalRoster rivals)
     {
-        foreach (var who in marks)
-            if (world.Characters.IsAlive(who) && memory!.HasShort(world, squad.Id, who, MemoryTag.TempEnemy)) return who;
+        if (!_engaged.Add(run.Id)) return;
+
+        var leaderId = Leader(world, run);
+        bool leaderSpeaks = leaderId is { } l && squad.Members.Contains(l) && Able(world, l);
+        var speaker = leaderSpeaks ? leaderId!.Value : member;
+        string kind = leaderSpeaks ? LeaderKind(world, run, rivals) : HunterLines.Engage;
+        Say(world, run, speaker, Line(world, run, speaker, kind, rivals, null));
+    }
+
+    /// <summary>
+    /// What the leader opens with: back after a fight, its last outcome; new, and its faction lost a leader to the law, the reckoning; else its first
+    /// words.
+    /// </summary>
+    static string LeaderKind(World world, BehaviourRun run, RivalRoster rivals)
+    {
+        if (Record(world, run, rivals) is not { } leader) return HunterLines.First;
+        if (leader.Remembered != RivalOutcome.None) return HunterLines.ForReturn(leader.Remembered);
+
+        return rivals.LastReckoning(leader.Faction) is null ? HunterLines.First : HunterLines.Reckoning;
+    }
+
+    /// <summary>
+    /// A line of the run's list, with its placeholders filled.
+    /// </summary>
+    static string Line(World world, BehaviourRun run, CharacterId speaker, string kind, RivalRoster rivals, RivalryOptions? options)
+    {
+        var leader = Record(world, run, rivals);
+        var fill = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["target"] = run.Args.Text("quarryName") ?? "",
+            ["name"] = NameOf(world, speaker),
+            ["leader"] = leader is null ? "" : rivals.LastReckoning(leader.Faction)?.Leader ?? "",
+            ["fallen"] = (leader?.LastComradesLost ?? 0).ToString(System.Globalization.CultureInfo.InvariantCulture),
+        };
+        ulong pick = Rng.Mix((ulong)world.Tick ^ (ulong)run.Id << 32 ^ (ulong)speaker.Slot << 16);
+        return HunterLines.Pick(run.Args, kind, pick, fill, options?.OffTargetLine);
+    }
+
+    /// <summary>
+    /// Says a line over the speaker's head and notes when the squad spoke.
+    /// </summary>
+    void Say(World world, BehaviourRun run, CharacterId speaker, string line)
+    {
+        if (line.Length == 0) return;
+
+        world.Bark(speaker, line);
+        _spokeAt[run.Id] = world.Tick;
+    }
+
+    /// <summary>
+    /// The run's leader in the roster; null when it has none.
+    /// </summary>
+    static RivalLeader? Record(World world, BehaviourRun run, RivalRoster rivals)
+    {
+        if (run.Args.Text("leaderName") is not { } name) return null;
+
+        return rivals.Leaders.FirstOrDefault(l => l.Name == name && l.Serial == (uint)run.Args.Number("leaderSerial"));
+    }
+
+    /// <summary>
+    /// The run's leader's character id; null when it is not in the world.
+    /// </summary>
+    static CharacterId? Leader(World world, BehaviourRun run)
+    {
+        uint serial = (uint)run.Args.Number("leaderSerial");
+        if (serial == 0) return null;
+
+        var table = world.Characters;
+        if (SquadDriver.SquadOf(world, run.Platoon) is not { } squad) return null;
+
+        foreach (var id in squad.Members)
+            if (table.TryResolveNext(id, out int slot) && table.Cold(slot)?.PortraitSerial == serial) return id;
 
         return null;
     }
 
     /// <summary>
-    /// Each standing member's fight: one that has just turned on someone other than the quarry says the off-target line, at most one member of the
-    /// squad per cooldown.
+    /// Whether a character is up and about.
     /// </summary>
-    void Watch(World world, Squad squad, CharacterId quarry, RivalryOptions options)
-    {
-        foreach (var member in squad.Members)
-        {
-            if (NewFoe(world, member) is not { } foe || foe == quarry) continue;
-            if (!MaySpeak(world, squad.Id, options)) continue;
-
-            world.Bark(member, OffTargetLine(world, quarry, options));
-            _spokeAt[squad.Id] = world.Tick;
-        }
-    }
+    static bool Able(World world, CharacterId id) =>
+        world.Characters.TryResolveNext(id, out int slot) && world.Characters.Cold(slot) is { Medical.Incapacitated: false };
 
     /// <summary>
-    /// The character <paramref name="member"/> fights when it started on them since the last look; null when it fights nobody, is down, or fights
-    /// the same one as before.
+    /// Whether a character is the player's.
+    /// </summary>
+    static bool IsPlayers(World world, CharacterId id) =>
+        world.Characters.TryResolveNext(id, out int slot) && world.Characters.Cold(slot) is { } c
+        && (c.IsPlayer || world.Player.Faction >= 0 && c.Faction == world.Player.Faction);
+
+    /// <summary>
+    /// A character's name; empty when it is gone.
+    /// </summary>
+    static string NameOf(World world, CharacterId id) =>
+        world.Characters.TryResolveNext(id, out int slot) ? world.Characters.Cold(slot)?.Name ?? "" : "";
+
+    /// <summary>
+    /// The character <paramref name="member"/> fights when it started on them since the last look; null when it is not in combat, is down, fights
+    /// someone down or gone, or fights the same one as before.
     /// </summary>
     CharacterId? NewFoe(World world, CharacterId member)
     {
         var table = world.Characters;
-        if (!table.TryResolveNext(member, out int slot) || table.Cold(slot) is not { Medical.Incapacitated: false })
+        if (!table.TryResolveNext(member, out int slot) || table.Cold(slot) is not { Medical.Incapacitated: false, InCombat: true })
         {
             _foes.Remove(member);
             return null;
         }
 
         var (targetSlot, generation) = combat!.TargetOf(slot, member.Generation);
-        if (targetSlot < 0)
+        var foe = new CharacterId(targetSlot, generation);
+        if (targetSlot < 0 || !Able(world, foe))
         {
             _foes.Remove(member);
             return null;
         }
-
-        var foe = new CharacterId(targetSlot, generation);
         if (_foes.TryGetValue(member, out var before) && before == foe) return null;
 
         _foes[member] = foe;
@@ -117,30 +195,26 @@ internal sealed class HunterBarks(CombatSystem? combat, SquadMemory? memory)
     }
 
     /// <summary>
-    /// Whether the squad's last line is at least <see cref="RivalryOptions.BarkCooldownSeconds"/> old.
+    /// Whether the run's squad last spoke at least <see cref="RivalryOptions.BarkCooldownSeconds"/> ago.
     /// </summary>
-    bool MaySpeak(World world, int squad, RivalryOptions options)
+    bool MaySpeak(World world, int run, RivalryOptions options)
     {
         long cooldown = (long)(options.BarkCooldownSeconds / world.TickSeconds);
-        return !_spokeAt.TryGetValue(squad, out long at) || world.Tick - at >= cooldown;
+        return !_spokeAt.TryGetValue(run, out long at) || world.Tick - at >= cooldown;
     }
 
     /// <summary>
-    /// The off-target line with <c>{target}</c> replaced by the quarry's name.
+    /// Drops remembered fights of members no longer in the world once there are many, and the state of runs that ended.
     /// </summary>
-    static string OffTargetLine(World world, CharacterId quarry, RivalryOptions options)
+    void Prune(World world, IReadOnlyList<BehaviourRun> runs)
     {
-        string name = world.Characters.TryResolveNext(quarry, out int slot) ? world.Characters.Cold(slot)?.Name ?? "" : "";
-        return options.OffTargetLine.Replace("{target}", name, StringComparison.Ordinal);
-    }
+        if (_foes.Count > PruneAbove)
+            foreach (var gone in _foes.Keys.Where(m => !world.Characters.IsAlive(m)).ToList()) _foes.Remove(gone);
 
-    /// <summary>
-    /// Drops remembered fights of members no longer in the world once there are many.
-    /// </summary>
-    void Prune(World world)
-    {
-        if (_foes.Count <= PruneAbove) return;
+        if (_engaged.Count + _spokeAt.Count == 0) return;
 
-        foreach (var gone in _foes.Keys.Where(m => !world.Characters.IsAlive(m)).ToList()) _foes.Remove(gone);
+        var live = runs.Select(r => r.Id).ToHashSet();
+        _engaged.RemoveWhere(id => !live.Contains(id));
+        foreach (int id in _spokeAt.Keys.Where(id => !live.Contains(id)).ToList()) _spokeAt.Remove(id);
     }
 }

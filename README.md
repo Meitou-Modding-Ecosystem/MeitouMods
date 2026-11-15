@@ -7,6 +7,8 @@ Code mods for [MeitouClient](https://github.com/TheIvoryDisaster/MeitouClient), 
 | Rivalry Core | `rivalry.core` | [docs/rivalry-core.md](docs/rivalry-core.md) |
 | The Ashen Hand | `ashen.hand` | [docs/ashen-hand.md](docs/ashen-hand.md) |
 
+Planned work: [docs/roadmap.md](docs/roadmap.md).
+
 ## Layout
 
 - `engine/`: MeitouClient as a git submodule, pinned to the commit the mods build against. Until the world hooks are merged upstream it

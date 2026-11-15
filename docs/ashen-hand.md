@@ -1,6 +1,6 @@
 # The Ashen Hand (content mod)
 
-A shadow order built on [Rivalry Core](rivalry-core.md) (`ashen.hand`, needs `rivalry.core` 0.4). Code: `AshenHand/`; data file generator:
+A shadow order built on [Rivalry Core](rivalry-core.md) (`ashen.hand`, needs `rivalry.core` 0.5). Code: `AshenHand/`; data file generator:
 `AshenHand.Data/`; tests: `AshenHand.Tests/`. The name is a working title.
 
 ## Lore
@@ -9,21 +9,30 @@ A shadow order built on [Rivalry Core](rivalry-core.md) (`ashen.hand`, needs `ri
   machine of the Second Empire, which the order means to wake and turn on the continent.
 - The dig needs money, hands and silence, hence its three arms: thieves fund it, takers supply labour (captives sold on, later kept), hunters
   answer anyone who hurts the order.
-- It owns no town and holds no relation: neutral to all until crossed. Future steps: named officers, the dig as a world state, takers who keep
-  their captives.
+- It owns no town and holds no relation: neutral to all until crossed. Its hunters set out from the Ashlands. Future steps: the dig as a world
+  state, takers who keep their captives; leaders' personalities and recruitment ([roadmap](roadmap.md)).
 
 ## Rules
 
 | Rule | Fires when | Does |
 | --- | --- | --- |
 | `ashen.hand.thieves` | a player outpost is calm, the player's net worth (`PlayerReport.Wealth`: cats, gear, stored goods, buildings) ≥ 40000 and the outpost holds ≥ 10000 (the player's cats + goods in its containers + what its people carry, worn gear aside); chance 0.2 a day; once per outpost per 72 h | `rivalry.burgle` with the thief squad: goal 1000 cats, stealth 40 to 60, martial arts 30 to 50 |
-| `ashen.hand.hunters` | the order's grudge against a standing player character ≥ Rivalry Core's `HuntThreshold` (60; a hit on one of its people adds 1, on a downed one 3, a kill 25); once per character per 48 h | `rivalry.pursue` with the hunter squad: melee attack, melee defence, strength and toughness 35 to 55 |
+| `ashen.hand.hunters` | the order's grudge against a standing player character ≥ Rivalry Core's `HuntThreshold` (60; a hit on one of its people adds 1, on a downed one 3, a kill 25); no hunter squad of the order out, the last one finished ≥ "Hours between hit squads" (72) ago; once per character per 48 h | `rivalry.pursue` with the hunter squad: melee attack, melee defence, strength and toughness 35 to 55, the order's names, lines and home (see "Hunters") |
 
 The player's cats are not in any container, so an outpost that holds only cats gives thieves nothing to take but pockets.
 
 Both rules pass `evidence` = the ledger, so each squad's leader carries an Ashen Hand Ledger (Rivalry Core's [Evidence](rivalry-core.md#evidence)):
 a log of days spent watching a mark. Right-clicked in a player character's inventory it puts a bounty on its owner with every lawful faction,
 2 × the run's goal and at least 3000 (3000 for both today), so turning the owner in pays where executing them does not.
+
+## Hunters
+
+Every member of a hunter squad is the same Ashen Hand Hunter; its leader takes a name from `AshenHandVoice.LeaderNames` and keeps it in
+Rivalry Core's [rival roster](rivalry-core.md#rival-leaders) until it dies, is jailed or recruited, so a leader the player beats or leaves for
+dead can come back, and speaks of the last fight (`AshenHandVoice.Lines`: original starter lines for each outcome, a predecessor handed to the
+law, first words, the distracted and engage lines). `home` is "Black Desert City": **Unknown** whether the game names a town so; when none
+matches, the squad's road takes Rivalry Core's fallback (12 h). Handing a leader to the law alive (carried to a lawful cage, or its bounty
+claimed) wipes the order's grudges.
 
 ## Data file
 
@@ -45,7 +54,8 @@ the game treats a FACTION record with only these two fields (Meitou reads absent
 
 ## Settings
 
-Mod settings page: Thieves, Hunters (switches), Thieves from net worth (40000), Outpost holds at least (10000), Thief chance per day (0.2).
+Mod settings page: Thieves, Hunters (switches), Hours between hit squads (72), Thieves from net worth (40000), Outpost holds at least (10000),
+Thief chance per day (0.2).
 The rules read the settings object directly at each assessment.
 
 ## Installing and trying it

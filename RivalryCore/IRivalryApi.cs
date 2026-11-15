@@ -41,6 +41,11 @@ public interface IRivalryState
 
     NotorietyLedger Notoriety { get; }
 
+    /// <summary>
+    /// The named leaders of hit squads and their records, the leaders handed to the law, and each faction's last hit squad.
+    /// </summary>
+    RivalRoster Rivals { get; }
+
     /// <summary>The latest decisions, newest last, as log lines (at most 64).</summary>
     IReadOnlyList<string> History { get; }
 

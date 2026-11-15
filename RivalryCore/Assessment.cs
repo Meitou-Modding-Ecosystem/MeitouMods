@@ -11,10 +11,17 @@ public sealed class Assessment
     readonly RngPurpose _purpose;
     readonly Catalogue _catalogue;
 
+    /// <summary>
+    /// The behaviours under way.
+    /// </summary>
+    readonly IReadOnlyList<BehaviourRun> _runs;
+
     internal Assessment(World world, PopulationData data, PlayerReport report, NotorietyLedger notoriety, RivalryOptions options, RngPurpose purpose,
-        Catalogue catalogue)
+        Catalogue catalogue, RivalRoster rivals, IReadOnlyList<BehaviourRun> runs)
     {
         _catalogue = catalogue;
+        _runs = runs;
+        Rivals = rivals;
         World = world;
         Data = data;
         Report = report;
@@ -30,6 +37,22 @@ public sealed class Assessment
     public PlayerReport Report { get; }
     public NotorietyLedger Notoriety { get; }
     public RivalryOptions Options { get; }
+
+    /// <summary>
+    /// The named leaders of hit squads, the leaders handed to the law, and when each faction's last hit squad finished. Read only here.
+    /// </summary>
+    public RivalRoster Rivals { get; }
+
+    /// <summary>
+    /// Whether one of the faction's hit squads (<see cref="BuiltIn.Pursue"/>) is on its way or fighting.
+    /// </summary>
+    public bool HitSquadUnderway(int faction) => _runs.Any(r => r.Faction == faction && PursueBehaviour.Underway(r));
+
+    /// <summary>
+    /// Game hours since the faction's last hit squad finished; infinity when none has.
+    /// </summary>
+    public double HoursSinceHitSquad(int faction) =>
+        Faction(faction) is { } f ? Rivals.HoursSinceEnded(f.Id, GameHours) : double.PositiveInfinity;
 
     public int PlayerFaction => Report.PlayerFaction;
     public double GameHours => World.GameHours;

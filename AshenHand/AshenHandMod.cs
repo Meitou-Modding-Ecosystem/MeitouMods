@@ -74,14 +74,16 @@ public sealed class AshenHandMod : IMod
     };
 
     /// <summary>
-    /// Hunters come for a standing character the order's grudge against has reached Rivalry Core's hunt threshold.
+    /// Hunters come for a standing character the order's grudge against has reached Rivalry Core's hunt threshold: one squad at a time, and not until
+    /// <see cref="AshenHandSettings.HitSquadRestHours"/> after the last one finished. Each squad is led by a named leader who remembers its last fight.
     /// </summary>
     static Rule Hunters(AshenHandSettings settings) => new()
     {
         Name = HuntersRule,
         Target = BuiltIn.CharacterTarget,
         When = (a, t) => a.Data.FactionIndex(AshenHandData.Faction) is >= 0 and var order
-            && a.Notoriety.Grudge(order, t.Character) >= a.Options.HuntThreshold,
+            && a.Notoriety.Grudge(order, t.Character) >= a.Options.HuntThreshold
+            && Rested(a, order, settings),
         Behaviour = BuiltIn.Pursue,
         Enabled = _ => settings.Hunters,
         CooldownHours = _ => HunterCooldownHours,
@@ -96,9 +98,16 @@ public sealed class AshenHandMod : IMod
             .Set("strengthMin", 35)
             .Set("strengthMax", 55)
             .Set("toughnessMin", 35)
-            .Set("toughnessMax", 55),
+            .Set("toughnessMax", 55)
+            .Voice(),
         Notice = (_, t) => $"The Ashen Hand has sent hunters for {t.Key}",
     };
+
+    /// <summary>
+    /// Whether the order has no hit squad out and its last one finished at least the rest ago.
+    /// </summary>
+    static bool Rested(Assessment a, int order, AshenHandSettings settings) =>
+        !a.HitSquadUnderway(order) && a.HoursSinceHitSquad(order) >= settings.HitSquadRestHours;
 
     /// <summary>
     /// What an outpost holds: the player's cats, the goods in its containers and what its people carry (worn gear aside).
