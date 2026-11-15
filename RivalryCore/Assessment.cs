@@ -54,6 +54,14 @@ public sealed class Assessment
     public double HoursSinceHitSquad(int faction) =>
         Faction(faction) is { } f ? Rivals.HoursSinceEnded(f.Id, GameHours) : double.PositiveInfinity;
 
+    /// <summary>
+    /// How many of the faction's squads in the world a grudge hunt could mark the character for now: within <see cref="RivalryOptions.HuntRadius"/>,
+    /// leader alive, in no campaign, not a town's own unless <see cref="RivalryOptions.UseTownSquads"/>.
+    /// </summary>
+    public int SquadsNear(int faction, CharacterId who) => World.Characters.TryResolveNext(who, out int slot)
+        ? Actions.Candidates(World, faction, World.Characters.Next[slot].Position, Options.HuntRadius, Options.UseTownSquads).Count()
+        : 0;
+
     public int PlayerFaction => Report.PlayerFaction;
     public double GameHours => World.GameHours;
 

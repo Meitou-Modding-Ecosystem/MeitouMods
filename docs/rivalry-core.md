@@ -63,7 +63,7 @@ director and key.
 | rule | `rivalry.reinforce` | town `rivalry.losing`: `rivalry.reinforce` by the closest ally (relation ≥ 50; allies with a DEFEND_TOWN campaign first); once per town per 12 h |
 | rule | `rivalry.opportunist` | town `rivalry.tempting`, chance `RaidChancePerDay`: `rivalry.raid` by the most hostile faction that has an assault campaign; once per town per 96 h |
 | rule | `rivalry.hit-squad` | a standing character against whom a faction's grudge is ≥ `HuntThreshold`: `rivalry.pursue` with that faction's own squad (see "Hit squads of any faction"); once per character per 48 h |
-| director | `rivalry.grudge` | a non-allied faction's grudge on a standing character ≥ `HuntThreshold` (60): `Hunt` with `HuntSquads` squads; largest first, at most 2 per assessment, once per faction and character name per 48 h |
+| director | `rivalry.grudge` | a non-allied faction's grudge on a standing character ≥ `HuntThreshold` (60) and a squad of it within `HuntRadius`: `Hunt` with `HuntSquads` squads (none near: nothing, no cooldown); largest first, at most 2 per assessment, once per faction and character name per 48 h |
 
 ## Rules
 
@@ -281,7 +281,7 @@ vanilla patrol squad of full size behaves when driven as a hit squad.
 | Started by | the director `rivalry.grudge` at an assessment, when the faction's grudge is ≥ 60 | the rule at an assessment (grudge ≥ 60, no squad of the faction out, rested 72 h), or `fire rule` |
 | What happens | the faction's squads **already in the world** within 20000 of the character hold them as an enemy and attack on sight. Nothing is spawned, nothing travels | a new squad travels from the faction's base, appears out of sight, closes in and attacks |
 | A run? | no: `runs and rules` stays empty | yes: one `rivalry.pursue` run |
-| How to see it | `Rivalry: character`: "N of its squads in the world hold them as an enemy", "marks again in X h"; `Rivalry: log`: `rivalry.grudge: hunt: Reavers sends N squad(s) after Zimm` (0: none was near) | `Rivalry: character`: "hit squads: The Ashen Hand run 3: travelling from its base, arrives in 5.2 h" |
+| How to see it | `Rivalry: character`: "N of its squads in the world hold them as an enemy", "marks again in X h"; `Rivalry: log`: `rivalry.grudge: hunt: N Reavers squad(s) already near Zimm now hold them as an enemy`; with none near, nothing is logged and the director looks again at each assessment | `Rivalry: character`: "hit squads: The Ashen Hand run 3: travelling from its base, arrives in 5.2 h" |
 
 A grudge from Reavers now starts both. `rivalry.grudge` cannot be fired: it is a director, not a rule. `rivalry.opportunist` and
 `rivalry.reinforce` aim at a town (a raid on it, allies coming to it), never at a character, and make no run either: they queue a campaign.
