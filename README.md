@@ -26,6 +26,18 @@ dotnet test
 
 After a pull that moves the engine pin: `git submodule update --init`.
 
+One click from Visual Studio: open `MeitouMods.slnx` and press F5 on the `Play` project; it builds the engine and mods, copies the mods
+into the game and runs it ([docs/play.md](docs/play.md)).
+
+A clone that won't build (empty `engine/`, wrong branch):
+
+```
+git fetch origin
+git checkout beta
+git pull
+git submodule update --init --recursive
+```
+
 ## Branches and releases
 
 - Work goes in PRs to `beta`; CI (build and tests) must pass. `beta` is merged into `main` once it has been tested in play.
