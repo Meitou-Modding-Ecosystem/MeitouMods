@@ -6,10 +6,10 @@ namespace Rivalry;
 public sealed partial class RivalrySystem
 {
     /// <summary>The sidecar layout's version (docs/rivalry-core.md "Save data").</summary>
-    public const int SaveVersion = 2;
+    public const int SaveVersion = 3;
 
     /// <summary>A saved grudge waiting for its character: faction by string id, character by name and record (slots differ after a load).</summary>
-    readonly record struct SavedGrudge(string Faction, string Name, string Record, float Value);
+    readonly record struct SavedGrudge(string Faction, string Name, string Record, float Value, float HeldFloor = 0);
 
     readonly record struct Subject(string Name, string Record);
 
@@ -32,13 +32,14 @@ public sealed partial class RivalrySystem
         }
 
         _runs.Write(_world, w);
+        Rivals.Write(w);
     }
 
     void WriteGrudges(BinaryWriter w)
     {
         var saved = Notoriety.Entries
             .Where(g => g.Key.Faction < _data.Factions.Count && _subjects.ContainsKey(g.Key.Who))
-            .Select(g => new SavedGrudge(_data.Factions[g.Key.Faction].Id, _subjects[g.Key.Who].Name, _subjects[g.Key.Who].Record, g.Value))
+            .Select(g => Saved(g.Key, g.Value))
             .Concat(_pending ?? [])
             .ToList();
         w.Write(saved.Count);
@@ -48,7 +49,17 @@ public sealed partial class RivalrySystem
             w.Write(g.Name);
             w.Write(g.Record);
             w.Write(g.Value);
+            w.Write(g.HeldFloor);
         }
+    }
+
+    /// <summary>
+    /// A grudge as saved: its faction by string id, its character by name and record, its value and held floor.
+    /// </summary>
+    SavedGrudge Saved(GrudgeKey key, float value)
+    {
+        var subject = _subjects[key.Who];
+        return new SavedGrudge(_data.Factions[key.Faction].Id, subject.Name, subject.Record, value, Notoriety.HeldFloor(key.Faction, key.Who));
     }
 
     public void Read(Stream stream)
@@ -62,19 +73,26 @@ public sealed partial class RivalrySystem
         }
         _nextAssess = r.ReadDouble();
         _lastAssess = r.ReadDouble();
-        _pending = ReadGrudges(r);
+        // Version 3 adds each grudge's held floor and, at the end, the rival roster.
+        _pending = ReadGrudges(r, withFloors: version >= 3);
         int count = r.ReadInt32();
         for (int i = 0; i < count; i++) _cooldowns.Set(r.ReadString(), r.ReadDouble());
 
         // Version 2 adds the behaviours under way.
         if (version >= 2) _runs.Read(r);
+        if (version >= 3) Rivals.Read(r);
     }
 
-    static List<SavedGrudge> ReadGrudges(BinaryReader r)
+    static List<SavedGrudge> ReadGrudges(BinaryReader r, bool withFloors)
     {
         int count = r.ReadInt32();
         var list = new List<SavedGrudge>(count);
-        for (int i = 0; i < count; i++) list.Add(new SavedGrudge(r.ReadString(), r.ReadString(), r.ReadString(), r.ReadSingle()));
+        for (int i = 0; i < count; i++)
+        {
+            var g = new SavedGrudge(r.ReadString(), r.ReadString(), r.ReadString(), r.ReadSingle());
+            list.Add(withFloors ? g with { HeldFloor = r.ReadSingle() } : g);
+        }
+
         return list;
     }
 
@@ -90,8 +108,17 @@ public sealed partial class RivalrySystem
         var table = world.Characters;
         var taken = new HashSet<(int, CharacterId)>();
         foreach (var g in _pending)
-            if (_data.FactionIndex(g.Faction) is >= 0 and var f && FindSubject(table, g, f, taken) is { IsNone: false } who) Notoriety.Add(f, who, g.Value);
+            if (_data.FactionIndex(g.Faction) is >= 0 and var f && FindSubject(table, g, f, taken) is { IsNone: false } who) Restore(f, who, g);
         _pending = null;
+    }
+
+    /// <summary>
+    /// Gives a saved grudge and its held floor back to its character.
+    /// </summary>
+    void Restore(int faction, CharacterId who, SavedGrudge g)
+    {
+        Notoriety.Add(faction, who, g.Value);
+        if (g.HeldFloor > 0) Notoriety.HoldFloor(faction, who, g.HeldFloor);
     }
 
     static CharacterId FindSubject(CharacterTable table, SavedGrudge g, int faction, HashSet<(int, CharacterId)> taken)

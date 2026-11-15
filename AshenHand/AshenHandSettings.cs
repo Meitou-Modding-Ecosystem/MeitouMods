@@ -20,6 +20,13 @@ public sealed class AshenHandSettings
     public bool Hunters { get; set; } = true;
 
     /// <summary>
+    /// Game hours after one hit squad finishes (beaten, won, broke off) before the order sends the next; only one is out at a time.
+    /// </summary>
+    [Setting("Hours between hit squads", Hint = "Rest after one squad finishes before the next is sent; one squad at a time.",
+        Min = 0, Max = 336, Step = 6)]
+    public double HitSquadRestHours { get; set; } = 72;
+
+    /// <summary>
     /// The player's net worth, buildings counted, from which thieves come.
     /// </summary>
     [Setting("Thieves from net worth", Hint = "Cats, gear, stored goods and buildings together.", Min = 0, Max = 500000, Step = 5000)]

@@ -23,8 +23,13 @@ public sealed class RivalryOptions
     [Setting("Hunters speak", Hint = "A hunter who fights someone on the way to its quarry says so over its head.")]
     public bool HunterBarks { get; set; } = true;
 
-    [Setting("Grudge half-life (days)", Min = 0.5, Max = 30, Step = 0.5)]
-    public double GrudgeHalfLifeDays { get; set; } = 4;
+    /// <summary>
+    /// How much every grudge cools per game hour; a grudge that sent a hit squad cools no lower than <see cref="HuntThreshold"/> until that squad is beaten
+    /// where the player can see it.
+    /// </summary>
+    [Setting("Grudge cools per game hour", Hint = "A grudge that sent a hit squad stays at the hunt threshold until you beat that squad in view.",
+        Min = 0, Max = 10, Step = 0.25)]
+    public double GrudgeCoolPerHour { get; set; } = 1;
 
     [Setting("Grudge that sends hunters", Min = 10, Max = 500, Step = 10)]
     public float HuntThreshold { get; set; } = 60;
@@ -54,6 +59,43 @@ public sealed class RivalryOptions
 
     /// <summary>AI_PACKAGE a nearby reinforcing squad runs; null: the first package with signal 15 (Contract_DefendPlayerBase) in the data, by id.</summary>
     public string? DefendPackage { get; set; }
+
+    /// <summary>
+    /// The most game hours a hit squad spends on the road from its faction's nearest base before it appears (<see cref="HuntTravelUnitsPerHour"/>).
+    /// </summary>
+    [Setting("Hit squad travel at most (game hours)", Hint = "A squad sent from a far base takes longer to arrive, up to this.", Min = 0, Max = 168, Step = 1)]
+    public double HuntTravelMaxHours { get; set; } = 48;
+
+    /// <summary>
+    /// How far a hit squad travels per game hour on its way from its base: the original's off-screen travel speed (25 a second) over its clock (1200/11
+    /// seconds per game hour) (engine docs/game/factions-squads-towns.md, game-loop.md).
+    /// </summary>
+    public double HuntTravelUnitsPerHour { get; set; } = 25 * 1200.0 / 11;
+
+    /// <summary>
+    /// The least travel time of a hit squad, and the travel time of one whose faction has no base found (no town and no <c>home</c> argument matched).
+    /// </summary>
+    public double HuntTravelMinHours { get; set; } = 1;
+    public double HuntTravelFallbackHours { get; set; } = 12;
+
+    /// <summary>
+    /// The ring round its quarry a hit squad appears in: beyond sight (1500 × a race's vision multiplier, engine docs/game/perception.md) and inside the
+    /// loaded 3 × 3 zones of 4608 round the camera, so it loads and walks in from off screen.
+    /// </summary>
+    public float HuntSpawnMinRadius { get; set; } = 2200;
+    public float HuntSpawnMaxRadius { get; set; } = 3400;
+
+    /// <summary>
+    /// How near a player character must stand to a beaten hit squad to have seen it beaten: the original's outdoor sight range (engine
+    /// docs/game/perception.md "Sight").
+    /// </summary>
+    public float SeenRange { get; set; } = 1500;
+
+    /// <summary>
+    /// Game hours a beaten squad's leader is watched for its fate (killed, captured, turned in, left for dead); a captive is watched for as long as
+    /// it is held.
+    /// </summary>
+    public double AftermathHours { get; set; } = 12;
 
     public int HuntSquads { get; set; } = 1;
     public float HuntRadius { get; set; } = 20000;

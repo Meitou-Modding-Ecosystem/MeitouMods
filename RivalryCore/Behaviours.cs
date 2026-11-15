@@ -119,9 +119,10 @@ public sealed class BehaviourContext
     readonly Inspector _inspector;
 
     internal BehaviourContext(World world, PopulationData data, PlayerReport report, RivalryOptions options, RngPurpose purpose, Actions actions,
-        BehaviourRuns runs, PopulationSystem? population, Inspector inspector, NotorietyLedger notoriety)
+        BehaviourRuns runs, PopulationSystem? population, Inspector inspector, NotorietyLedger notoriety, RivalRoster rivals)
     {
         Notoriety = notoriety;
+        Rivals = rivals;
         _inspector = inspector;
         World = world;
         Data = data;
@@ -162,6 +163,11 @@ public sealed class BehaviourContext
     /// The grudges factions hold against characters.
     /// </summary>
     public NotorietyLedger Notoriety { get; }
+
+    /// <summary>
+    /// The named leaders of hit squads, the leaders handed to the law, and each faction's last hit squad.
+    /// </summary>
+    public RivalRoster Rivals { get; }
 
     /// <summary>
     /// A uniform number in [0, 1), the same for the same world seed, tick and key.

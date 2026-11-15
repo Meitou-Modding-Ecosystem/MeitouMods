@@ -84,6 +84,7 @@ public sealed class RivalryMod : IMod, IRivalryApi, IModDependents
         });
         c.AddDebugCommand("Rivalry: grudge on selected (faction[, amount])", d => QueueGrudge(d), hasField: true);
         c.AddDebugCommand("Rivalry: runs and rules", _ => DescribeRuns(_latest));
+        c.AddDebugCommand("Rivalry: rival leaders", _ => DescribeRivals(_latest));
         c.AddDebugCommand("Rivalry: fire rule (rule[, town or character])", d => QueueRule(d), hasField: true);
         c.AddDebugCommand("Rivalry: visit town (template, faction[, hours[, town]])", d => QueueVisit(d), hasField: true);
     }
@@ -97,6 +98,17 @@ public sealed class RivalryMod : IMod, IRivalryApi, IModDependents
 
         string runs = system.Runs.Count > 0 ? string.Join("; ", system.Runs) : "no runs";
         return $"{runs} | rules: {string.Join(", ", system.RuleNames)}";
+    }
+
+    /// <summary>
+    /// The named hit squad leaders with their records, and the leaders handed to the law (read between ticks, as the other rows).
+    /// </summary>
+    static string DescribeRivals(RivalrySystem? system)
+    {
+        if (system is null) return "no world yet";
+
+        var lines = system.Rivals.Describe().ToList();
+        return lines.Count > 0 ? string.Join("; ", lines) : "no rival leaders yet";
     }
 
     /// <summary>
