@@ -35,6 +35,11 @@ internal sealed class RuleEngine(Registry registry, Action<string> log)
     public IEnumerable<string> Names => _rules.Select(r => r.Name);
 
     /// <summary>
+    /// The rules as the debug rows show them, in the order added.
+    /// </summary>
+    public IReadOnlyList<RuleView> Views { get; } = [.. registry.Rules.Select(e => new RuleView(e.Value.Name, e.Value.Target, e.Value.Behaviour))];
+
+    /// <summary>
     /// How many rules threw in this world.
     /// </summary>
     public int Faulted => _faulted.Count;

@@ -292,4 +292,31 @@ public class RivalryCoreTests
         Assert.False(market.Buys(data.FactionIndex("60-a"), "73-a"));    // a faction without slaves
         Assert.Equal(-1, market.NearestBuyer(TownAt, "73-a", data.FactionIndex("60-a")));   // no town to sell in
     }
+
+    [Fact]
+    public void The_debug_rows_tell_what_is_held_against_a_character_and_refuse_a_rule_aimed_at_the_wrong_thing()
+    {
+        var data = Data();
+        var (world, system, options) = Make(data);
+        int foes = data.FactionIndex("61-a");
+        var me = Spawn(world, "Zimm", world.Player.Faction, TownAt);
+        Spawn(world, "Beep", world.Player.Faction, TownAt);
+        world.RunTicks(2);
+
+        Assert.Equal("no grudges and no hit squads against anyone", system.Debug.DescribeCharacters("", []));
+        Assert.Contains("is not one of yours (Home = town1)", system.Debug.CheckRule("rivalry.opportunist", "Zimm"));
+        Assert.Null(system.Debug.CheckRule("rivalry.opportunist", "home"));
+        Assert.StartsWith("no rule 'rivalry.grudge'", system.Debug.CheckRule("rivalry.grudge", null));
+
+        world.Commands.Enqueue(new GrudgeCommand([me], "Foes", options.HuntThreshold + 40) { Tick = world.Tick });
+        world.RunTicks(2);
+
+        string selected = system.Debug.DescribeCharacters("", [me]);
+        Assert.StartsWith("Zimm: notoriety 100, hunts start at 60 | grudges: Foes 100", selected);
+        Assert.Contains("no hit squad after them", selected);
+        Assert.DoesNotContain("Beep", selected);
+        Assert.Equal(selected, system.Debug.DescribeCharacters("zimm", []));
+        Assert.StartsWith("no player character named 'Nobody'", system.Debug.DescribeCharacters("Nobody", []));
+        Assert.StartsWith("Beep: notoriety 0", system.Debug.DescribeCharacters("Beep", []));
+    }
 }

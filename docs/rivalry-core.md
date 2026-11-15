@@ -258,48 +258,88 @@ character loses its grudges across a save made before the rename.
 ## Debug rows (F10)
 
 A row with a field takes its values separated by commas, in the order below; spaces round a value are dropped, so a name cannot hold a comma.
-`[x]` may be left out. The row's own status line only says what was queued; the outcome is a `debug:` line in the game log one tick later (so the game must not be paused), and
-`Rivalry: report` shows the latest line.
+`[x]` may be left out. A row that changes something only queues it: it happens at the next tick, so **unpause**, then press `Rivalry: log` or
+`Rivalry: character`. A row refuses at once, in its status line, what cannot work (unknown rule or faction, a target of the wrong kind) and
+lists what would. The reading rows show a copy of the state made once a game second; their answer also goes to the game log, in full.
+
+### Two ways a character gets hunted
+
+| | Grudge hunt | Hit squad |
+| --- | --- | --- |
+| Who | any faction that is not an ally | only a faction a mod gave a hit squad rule: today The Ashen Hand (`ashen.hand.hunters`) |
+| Started by | the director `rivalry.grudge` at an assessment, when the faction's grudge is ≥ 60 | that rule at an assessment (grudge ≥ 60, no squad of the faction out, rested), or `fire rule` |
+| What happens | the faction's squads **already in the world** within 20000 of the character hold them as an enemy and attack on sight. Nothing is spawned, nothing travels | a new squad travels from the faction's base, appears out of sight, closes in and attacks |
+| A run? | no: `runs and rules` stays empty | yes: one `rivalry.pursue` run |
+| How to see it | `Rivalry: character`: "N of its squads in the world hold them as an enemy", "marks again in X h"; `Rivalry: log`: `rivalry.grudge: hunt: Reavers sends N squad(s) after Zimm` (0: none was near) | `Rivalry: character`: "hit squads: The Ashen Hand run 3: travelling from its base, arrives in 5.2 h" |
+
+So a grudge from Reavers never makes a run, and `rivalry.grudge` cannot be fired: it is a director, not a rule. `rivalry.opportunist` and
+`rivalry.reinforce` aim at a town (a raid on it, allies coming to it), never at a character, and make no run either: they queue a campaign.
+
+### Rows
 
 | Row | Field | Does |
 | --- | --- | --- |
-| `Rivalry: report` | none | characters, wealth (money, carried, stored, built), grudges, each town's buildings, stored value, defence and threat, the latest log line |
-| `Rivalry: assess now` | none | runs the inspection, rules and directors at the next step instead of waiting for the period |
-| `Rivalry: runs and rules` | none | the behaviours under way (id, behaviour, town, platoon, phase, end hour) and every rule's name |
+| `Rivalry: report` | none | characters, wealth (money, carried, stored, built), grudge count, each town's buildings, stored value, defence and threat, the latest log line |
+| `Rivalry: log` | none | the six latest decisions and debug results, newest first |
+| `Rivalry: character` | `[name]` | for the named character (any case), else the selected ones, else everyone with a grudge or a hit squad: notoriety, each faction's grudge, the squads hunting them, the rules resting on them |
+| `Rivalry: assess now` | none | runs the inspection, rules and directors at the next tick instead of waiting for the period (2 h) |
+| `Rivalry: runs and rules` | none | the runs under way in words, and every rule with what it aims at |
 | `Rivalry: rival leaders` | none | each named leader's record and fate, and the leaders handed to the law |
 | `Rivalry: faction bases` | `faction` | how the faction's bases were found, their count and the five nearest the first player character |
-| `Rivalry: grudge on selected` | `faction[, amount]` | adds `amount` to the faction's grudge against each selected character |
+| `Rivalry: grudge on selected` | `faction[, amount]` | adds `amount` to the faction's grudge against each selected character. Nothing else happens until the next assessment |
 | `Rivalry: fire rule` | `rule[, target]` | starts the rule's behaviour on one target, skipping its switch, conditions, chance and cooldown |
 | `Rivalry: visit town` | `template, faction[, hours[, town]]` | starts `rivalry.visit` (see "Visit") |
 
 | Value | Accepts | Left out |
 | --- | --- | --- |
-| `rule` | a rule's full name, exact case, as `Rivalry: runs and rules` lists it: `rivalry.reinforce`, `rivalry.opportunist`, and dependents' (`ashen.hand.thieves`, `ashen.hand.hunters`) | required |
-| `target` | for a town rule: the player town's name (any case), its number, or its key `town{number}`. For a character rule: the character's name, exact case; it must be standing | the rule's first target: the first player town, or the first standing character |
-| `faction` | a faction's name (any case) or record id | required; unknown: nothing happens (grudge) or the behaviour refuses (visit) |
+| `rule` | a rule's full name, exact case, as `runs and rules` lists it with its target kind: `rivalry.reinforce [a town]`, `rivalry.opportunist [a town]`, `ashen.hand.thieves [a town]`, `ashen.hand.hunters [a character]` | required |
+| `target` | for a town rule: the player town's name (any case), its number, or `town{number}`. For a character rule: a standing player character's name, exact case | the rule's first target: the first player town, or the first standing character |
+| `name` | a player character's name, any case | the selected characters; none selected: everyone with a grudge or a hit squad |
+| `faction` | a faction's name as the game shows it (any case) or its record id | required |
 | `amount` | a number, `.` as decimal point; negative eases the grudge | 100 |
 | `template` | a SQUAD_TEMPLATE's record id (not its name) whose package is a wandering trader's | required |
 | `hours` | the stay in game hours | 48 |
 | `town` | as a town `target` | the first player town |
 
-Examples (a player town named `Home`, a character named `Beep`):
+### What `Rivalry: character` says
 
-| Row | Field | Expect in the log |
+`Zimm: notoriety 175, hunts start at 60 | grudges: Reavers 100, 1 of its squads in the world hold them as an enemy, marks again in 46.5 h;
+The Ashen Hand 75, held at 60 until its hit squad is beaten | hit squads: The Ashen Hand run 3: travelling from its base, arrives in 5.2 h
+(leader Varn) | rules resting: ashen.hand.hunters 47.1 h`
+
+| Part | Meaning |
+| --- | --- |
+| `notoriety` | every faction's grudge summed |
+| `(below the threshold)` | that grudge is under `HuntThreshold`: it starts nothing |
+| `N of its squads ... hold them as an enemy` | grudge hunt under way: that many of the faction's squads in the world have the character marked now (the mark fades by the game's own rule) |
+| `marks again in X h` | the grudge director's rest for that faction and character (48 h) |
+| `held at 60 until its hit squad is beaten` | the grudge cannot cool below this while a hit squad is owed a fight |
+| `its last hit squad finished X h ago` | the faction's rest between hit squads counts from here (The Ashen Hand: 72 h) |
+| `no hit squad after them` | no `rivalry.pursue` run aims at the character |
+| `rules resting` | cooldowns that name the character: the rule cannot fire on them by itself for that long (`fire rule` ignores it) |
+| `(down: not hunted while down)` | hunts start only against standing characters |
+
+A hit squad's states: `travelling from its base, arrives in X h` (nothing in the world yet); `arrived, no free spot to appear at yet`;
+`spawned out of sight as platoon N, not in the loaded world yet` (it exists but no player character is near enough to load it); `spawned and
+closing in, gives up in X h`; `engaged, gives up in X h`; `beaten or called off; its leader is watched`. After the last one ends the run goes.
+
+### Recipes
+
+| To see | Do | Expect |
 | --- | --- | --- |
-| fire rule | `ashen.hand.thieves` | `debug: rule ashen.hand.thieves fired on town1`, then `ashen.hand.thieves: burgle: run 1 against town 1, ...` |
-| fire rule | `ashen.hand.thieves, Home` | the same, on that town |
-| fire rule | `ashen.hand.hunters, Beep` | `debug: rule ashen.hand.hunters fired on Beep`, then `ashen.hand.hunters: pursue: run 2 after Beep, ...` |
-| fire rule | `rivalry.opportunist, town1` | fired, then the raid's line; `no faction` unless a hostile faction has an assault campaign |
-| fire rule | `rivalry.reinforce` | fired, then the reinforce line; `no faction` unless the player has an ally (relation ≥ 50) |
-| grudge on selected | `The Ashen Hand, 100` | no log line; the next assessment sends its hunters (threshold 60); `assess now` brings it at once |
-| grudge on selected | `Dust Bandits` | +100; the grudge director then marks the character for that faction's nearby squads |
-| visit town | `<trader squad id>, Tech Hunters, 24, Home` | `debug: visit: run 3, <id> to town 1, ...` |
+| a grudge hunt | select Zimm; `grudge on selected`: `Reavers, 100`; unpause; `assess now`; unpause; `character` | `grudges: Reavers 100, N of its squads ...`; N is 0 when no Reaver squad is within 20000, and then nothing comes |
+| a hit squad now | `fire rule`: `ashen.hand.hunters, Zimm`; unpause; `character` | `hit squads: The Ashen Hand run 1: travelling ...` |
+| a hit squad by its rule | select Zimm; `grudge on selected`: `The Ashen Hand, 100`; unpause; `assess now`; unpause; `character` | the same, plus `rules resting: ashen.hand.hunters 48 h` |
+| thieves now | `fire rule`: `ashen.hand.thieves` (or `ashen.hand.thieves, Home`) | `runs and rules`: `run 2 rivalry.burgle: The Ashen Hand -> town 1: ...` |
+| a raid on a town | `fire rule`: `rivalry.opportunist, Home` | `log`: `rivalry.opportunist: raid: <faction> queued <campaign> against town 1`; no run |
+| allies coming | `fire rule`: `rivalry.reinforce` | `log`: `rivalry.reinforce: reinforce: <faction> to town 1: ...`; no run |
+| a trader visit | `visit town`: `<trader squad id>, Tech Hunters, 24, Home` | `log`: `debug: visit: run 3, ...` |
 
-What a `fire rule` line means: `no rule X` (misspelt, or its mod is not loaded); `rule X: no target K` (no such town or standing character;
-a town rule given a character, or the reverse); `rule X: no faction for K` (the rule's own faction pick found none: for The Ashen Hand,
-`AshenHand.mod` is missing or not enabled); `rule X threw: ...`. A rule fired this way does not start its cooldown. The behaviour's own line follows;
-`burgle: no population`, `no template` or `no town` are its refusals, and `waiting for a spot` means no walkable point was found yet in the
-ring round the town (tried again for 24 h). The record ids in a visit are the game's own, read in FCS; none is listed here.
+What a `fire rule` result in the log means: `debug: rule X fired on K`, then the behaviour's own line; `rule X: no faction for K` (the
+rule's faction pick found none: reinforce needs an ally at relation ≥ 50, opportunist a hostile faction with an assault campaign, The Ashen
+Hand its `AshenHand.mod`); `rule X threw: ...`. A rule fired this way does not start its cooldown. Behaviour refusals: `no population`,
+`no template`, `no town`, `quarry gone`; `waiting for a spot`: no walkable point found yet in the ring (tried again for 24 h). Record ids in
+a visit are the game's own, read in FCS.
 
 ## Building
 
@@ -311,7 +351,7 @@ Tests: `dotnet test RivalryCore.Tests` (synthetic worlds, no game needed).
 
 **Verified** by `RivalryCore.Tests` (synthetic worlds without a population system): the reinforce rule and its nearby squad, a grudge's
 hunt, grudges and cooldowns across a save, a dependent's probe/condition/rule firing once per cooldown, a run across a save, a version 1 save
-loading, name prefixes and dropping a mod's pieces, the world hash on 1 and 4 threads, which races a faction buys (`SlaveMarket`). Burgle and
+loading, name prefixes and dropping a mod's pieces, the world hash on 1 and 4 threads, which races a faction buys (`SlaveMarket`), the debug rows' character report for a grudge and their refusal of a rule aimed at the wrong kind of target. Burgle and
 Pursue have no test of their steps; nor do grudge cooling and floors, the rival roster, leader fates or the barks. **Unknown**: everything in a real game (campaign starts
 from `RequestCampaign`, contract packages, the Visit behaviour end to end, a run's platoon found again after a real load), and the
 `meitou-tools mod-check` result.

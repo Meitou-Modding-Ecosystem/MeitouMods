@@ -30,6 +30,11 @@ public sealed partial class RivalrySystem : ICombatHitObserver, IStateHashed, IM
 {
     public const int HistoryLength = 64;
 
+    /// <summary>
+    /// Ticks between copies of the state for the debug rows (one game second at 30 ticks a second); a debug command or an assessment copies at once.
+    /// </summary>
+    public const int ViewEveryTicks = 30;
+
     readonly PopulationData _data;
     readonly IReadOnlyList<IDirector> _directors;
     readonly RivalryOptions _settings;
@@ -42,6 +47,7 @@ public sealed partial class RivalrySystem : ICombatHitObserver, IStateHashed, IM
     readonly BehaviourRuns _runs;
     readonly PopulationSystem? _population;
     readonly HunterBarks _barks;
+    readonly SquadMemory? _memory;
     readonly Cooldowns _cooldowns = new();
     readonly HashSet<string> _faulted = new(StringComparer.Ordinal);
     readonly List<string> _history = [];
@@ -51,6 +57,7 @@ public sealed partial class RivalrySystem : ICombatHitObserver, IStateHashed, IM
     double _nextAssess = double.NaN;
     double _lastAssess = double.NaN;
     bool _assessNow;
+    bool _viewDue = true;
 
     internal RivalrySystem(SystemBuildContext context, Registry registry, RivalryOptions settings, RngPurpose purpose, Action<string> log)
     {
@@ -63,8 +70,8 @@ public sealed partial class RivalrySystem : ICombatHitObserver, IStateHashed, IM
         _inspector = new Inspector(_data, [.. registry.TownProbes.Select(e => (e.Name, e.Value))], [.. registry.CharacterProbes.Select(e => (e.Name, e.Value))]);
         _population = context.Find<PopulationSystem>();
         _catalogue = new Catalogue(_data, _population);
-        var memory = context.Find<DialogueSystem>()?.Memory;
-        _actions = new Actions(_data, _population, memory, Notoriety, _catalogue);
+        _memory = context.Find<DialogueSystem>()?.Memory;
+        _actions = new Actions(_data, _population, _memory, Notoriety, _catalogue);
         _barks = new HunterBarks(context.Find<CombatSystem>());
         _rules = new RuleEngine(registry, log);
         _runs = new BehaviourRuns(_data, registry.Behaviours.ToDictionary(e => e.Name, e => e.Value, StringComparer.Ordinal), log);
@@ -100,6 +107,11 @@ public sealed partial class RivalrySystem : ICombatHitObserver, IStateHashed, IM
     public IReadOnlyList<string> Runs { get; private set; } = [];
 
     /// <summary>
+    /// What the debug rows read: a copy, safe to read from the host's thread.
+    /// </summary>
+    public DebugView Debug { get; private set; } = DebugView.Empty;
+
+    /// <summary>
     /// The rules' names, in evaluation order.
     /// </summary>
     public IEnumerable<string> RuleNames => _rules.Names;
@@ -112,6 +124,9 @@ public sealed partial class RivalrySystem : ICombatHitObserver, IStateHashed, IM
             if (command is AssessNowCommand) _assessNow = true;
             else if (command is GrudgeCommand g) AddGrudge(g);
             else if (command is FireRuleCommand or StartBehaviourCommand) _asked.Add(command);
+            else continue;
+
+            _viewDue = true;
         }
     }
 
@@ -124,10 +139,23 @@ public sealed partial class RivalrySystem : ICombatHitObserver, IStateHashed, IM
         _barks.Step(world, _runs.All, Rivals, _options);
         RunAsked(world);
         if (double.IsNaN(_nextAssess)) _nextAssess = world.GameHours;
-        if (!_assessNow && world.GameHours < _nextAssess) return;
+        if (_assessNow || world.GameHours >= _nextAssess)
+        {
+            _assessNow = false;
+            _viewDue = true;
+            Assess(world);
+        }
 
-        _assessNow = false;
-        Assess(world);
+        if (_viewDue || world.Tick % ViewEveryTicks == 0) PublishView(world);
+    }
+
+    /// <summary>
+    /// Copies the state for the debug rows.
+    /// </summary>
+    void PublishView(World world)
+    {
+        _viewDue = false;
+        Debug = DebugView.Build(world, _data, Report, Notoriety, _cooldowns, _runs.All, Rivals, _rules.Views, _options, _memory);
     }
 
     void AddGrudge(GrudgeCommand g)
@@ -137,7 +165,7 @@ public sealed partial class RivalrySystem : ICombatHitObserver, IStateHashed, IM
         foreach (var who in g.Characters) Notoriety.Add(faction, who, g.Amount);
     }
 
-    int FactionByName(string text)
+    internal int FactionByName(string text)
     {
         if (_data.FactionIndex(text) is >= 0 and var byId) return byId;
         for (int f = 0; f < _data.Factions.Count; f++)
