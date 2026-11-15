@@ -62,8 +62,19 @@
     <ProjectReference Include="@(PlayReference);@(PlayMod)" />
   </ItemGroup>
 
+  <!--
+    Inside Visual Studio a project reference is not built by the referencing project (VS builds it itself, in the solution's configuration),
+    so a Debug solution would leave the $(PlayConfiguration) outputs unbuilt: build them here, as the command line would (references
+    included, not the solution's configuration map). Outside VS the references already did.
+  -->
+  <Target Name="PlayBuildInVisualStudio" AfterTargets="Build" Condition="'$(BuildingInsideVisualStudio)' == 'true'">
+    <MSBuild Projects="@(PlayReference);@(PlayMod)" Targets="Build" BuildInParallel="true"
+             Properties="Configuration=$(PlayConfiguration);BuildingInsideVisualStudio=false;BuildProjectReferences=true"
+             RemoveProperties="CurrentSolutionConfigurationContents" />
+  </Target>
+
   <!-- Copies each mod's assembly, symbols and manifest; skipped (with a message) when the mods folder doesn't exist, as on CI. -->
-  <Target Name="PlayDeploy" AfterTargets="Build" DependsOnTargets="PlayModFiles" Condition="'$(PlayDeploy)' == 'true'">
+  <Target Name="PlayDeploy" AfterTargets="Build;PlayBuildInVisualStudio" DependsOnTargets="PlayModFiles" Condition="'$(PlayDeploy)' == 'true'">
     <MakeDir Directories="@(PlayMod->'$(KenshiModsDir)%(ModName)')" />
     <Copy SourceFiles="@(PlayModFile)" DestinationFiles="@(PlayModFile->'$(KenshiModsDir)%(ModName)/%(Filename)%(Extension)')"
           SkipUnchangedFiles="true" />
