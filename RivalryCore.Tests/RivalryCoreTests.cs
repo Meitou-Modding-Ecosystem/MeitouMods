@@ -141,7 +141,7 @@ public class RivalryCoreTests
 
         world.RunTicks(2);
 
-        Assert.Contains(system.History, l => l.Contains("hunt: Foes sends 1 squad(s) after Me"));
+        Assert.Contains(system.History, l => l.Contains("hunt: 1 Foes squad(s) already near Me now hold them as an enemy"));
 
         var (world2, system2, _) = Make(data);
         Spawn(world2, "Other", world2.Player.Faction, TownAt);
@@ -351,5 +351,25 @@ public class RivalryCoreTests
         world.Commands.Enqueue(new AssessNowCommand { Tick = world.Tick });
         world.RunTicks(2);
         Assert.Contains(system.History, l => l.StartsWith(BuiltIn.HitSquadRule + ": pursue:"));
+    }
+
+    [Fact]
+    public void A_grudge_with_no_squad_near_logs_nothing_and_hunts_once_one_comes()
+    {
+        var data = Data();
+        var (world, system, _) = Make(data);
+        int foes = data.FactionIndex("61-a");
+        var me = Spawn(world, "Me", world.Player.Faction, TownAt);
+        world.RunTicks(2);
+
+        system.Notoriety.Add(foes, me, 100);
+        world.Commands.Enqueue(new AssessNowCommand { Tick = world.Tick });
+        world.RunTicks(2);
+        Assert.DoesNotContain(system.History, l => l.Contains("hunt:"));
+
+        AddSquad(world, foes, Spawn(world, "Foe", foes, TownAt + new Vector3(500, 0, 0)));
+        world.Commands.Enqueue(new AssessNowCommand { Tick = world.Tick });
+        world.RunTicks(2);
+        Assert.Contains(system.History, l => l.Contains("hunt: 1 Foes squad(s) already near Me"));   // the miss claimed no cooldown
     }
 }

@@ -40,7 +40,10 @@ internal sealed class Actions(PopulationData data, PopulationSystem? population,
             memory?.Flag(world, squad.Id, d.Target, MemoryTag.TempEnemy);
             if (package is not null) Direct(world, squad.Id, package, d.Hours, d.Target);
         }
-        return $"hunt: {FactionName(d.Faction)} sends {squads.Count} squad(s) after {world.Characters.Cold(slot)?.Name}";
+        string name = world.Characters.Cold(slot)?.Name ?? "";
+        return squads.Count > 0
+            ? $"hunt: {squads.Count} {FactionName(d.Faction)} squad(s) already near {name} now hold them as an enemy"
+            : $"hunt: no {FactionName(d.Faction)} squad within {options.HuntRadius:0} of {name}";
     }
 
     string Raid(World world, RaidDecision d)
@@ -107,7 +110,7 @@ internal sealed class Actions(PopulationData data, PopulationSystem? population,
     /// Squads of the faction that may be sent, nearest first within the radius (ground plane; id order breaks ties): not the player's, not dead, with a
     /// living leader, in no campaign, and not a town's own squad unless allowed.
     /// </summary>
-    static IEnumerable<Squad> Candidates(World world, int faction, Vector3 at, float radius, bool townSquads)
+    internal static IEnumerable<Squad> Candidates(World world, int faction, Vector3 at, float radius, bool townSquads)
     {
         var inCampaign = world.Platoons.All.Where(p => p.Campaign is not null && p.SquadId >= 0).Select(p => p.SquadId).ToHashSet();
         return world.Squads.All

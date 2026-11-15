@@ -3,8 +3,9 @@ using Meitou.Data.Gameplay;
 namespace Rivalry;
 
 /// <summary>
-/// A faction whose grudge against a standing player character reaches <see cref="RivalryOptions.HuntThreshold"/> sends hunters after them, largest grudge first,
-/// at most <see cref="RivalryOptions.MaxHuntsPerAssessment"/> per assessment and once per faction and character per cooldown. Allies never hunt.
+/// A faction whose grudge against a standing player character reaches <see cref="RivalryOptions.HuntThreshold"/> has its squads already near them
+/// hold them as an enemy; with none near nothing happens and it looks again at the next assessment. Largest grudge first, at most
+/// <see cref="RivalryOptions.MaxHuntsPerAssessment"/> per assessment and once per faction and character per cooldown. Allies never hunt.
 /// </summary>
 public sealed class GrudgeDirector : IDirector
 {
@@ -22,6 +23,8 @@ public sealed class GrudgeDirector : IDirector
         {
             if (sent >= a.Options.MaxHuntsPerAssessment) break;
             // Keyed by name, not slot: slots change when a save loads, and the cooldown comes back with it.
+            // No squad near: nothing to mark, nothing logged, and the cooldown stays free for when one comes by.
+            if (a.SquadsNear(key.Faction, key.Who) == 0) continue;
             if (!d.TryClaim($"{key.Faction}:{a.Report.Find(key.Who)?.Name}", a.Options.HuntCooldownHours)) continue;
             d.Hunt(key.Faction, key.Who, a.Options.HuntSquads, hours: a.Options.HuntHours);
             if (a.Options.Announce) d.Notice($"{a.Faction(key.Faction)?.Name} wants {a.Report.Find(key.Who)?.Name} dead");
