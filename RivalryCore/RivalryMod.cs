@@ -77,28 +77,50 @@ public sealed class RivalryMod : IMod, IRivalryApi, IModDependents
     void AddDebugRows(ModContext c)
     {
         c.AddDebugCommand("Rivalry: report", _ => Describe(_latest));
+        c.AddDebugCommand("Rivalry: log (latest results)", _ => Told(c, DescribeLog(_latest)));
+        c.AddDebugCommand("Rivalry: character (name; empty: selected, else all)",
+            d => Told(c, _latest?.Debug.DescribeCharacters(d.Field, d.Selected) ?? NoWorld), hasField: true);
         c.AddDebugCommand("Rivalry: assess now", d =>
         {
             d.Enqueue(new AssessNowCommand { Tick = d.Tick + 1 });
-            return "assessment queued";
+            return "assessment queued: unpause, then see 'Rivalry: log'";
         });
         c.AddDebugCommand("Rivalry: grudge on selected (faction[, amount])", d => QueueGrudge(d), hasField: true);
-        c.AddDebugCommand("Rivalry: runs and rules", _ => DescribeRuns(_latest));
+        c.AddDebugCommand("Rivalry: runs and rules", _ => Told(c, _latest?.Debug.DescribeRuns() ?? NoWorld));
         c.AddDebugCommand("Rivalry: rival leaders", _ => DescribeRivals(_latest));
-        c.AddDebugCommand("Rivalry: faction bases (faction)", d => _latest?.DescribeBases(d.Field) ?? "no world yet", hasField: true);
+        c.AddDebugCommand("Rivalry: faction bases (faction)", d => _latest?.DescribeBases(d.Field) ?? NoWorld, hasField: true);
         c.AddDebugCommand("Rivalry: fire rule (rule[, town or character])", d => QueueRule(d), hasField: true);
         c.AddDebugCommand("Rivalry: visit town (template, faction[, hours[, town]])", d => QueueVisit(d), hasField: true);
     }
 
     /// <summary>
-    /// The behaviours under way and the rules' names.
+    /// A row's status before any world runs.
     /// </summary>
-    static string DescribeRuns(RivalrySystem? system)
-    {
-        if (system is null) return "no world yet";
+    const string NoWorld = "no world yet";
 
-        string runs = system.Runs.Count > 0 ? string.Join("; ", system.Runs) : "no runs";
-        return $"{runs} | rules: {string.Join(", ", system.RuleNames)}";
+    /// <summary>
+    /// How many of the latest log lines the log row shows.
+    /// </summary>
+    const int LogLines = 6;
+
+    /// <summary>
+    /// Writes a row's answer to the game log too (the menu's status line is one line), and returns it.
+    /// </summary>
+    static string Told(ModContext c, string answer)
+    {
+        c.Log(answer);
+        return answer;
+    }
+
+    /// <summary>
+    /// The latest decisions and debug results, newest first.
+    /// </summary>
+    static string DescribeLog(RivalrySystem? system)
+    {
+        if (system is null) return NoWorld;
+
+        var lines = system.History.Reverse().Take(LogLines).ToList();
+        return lines.Count > 0 ? string.Join(" || ", lines) : "nothing decided yet";
     }
 
     /// <summary>
@@ -113,15 +135,19 @@ public sealed class RivalryMod : IMod, IRivalryApi, IModDependents
     }
 
     /// <summary>
-    /// Queues a rule to fire on a target, whatever its conditions say.
+    /// Queues a rule to fire on a target, whatever its conditions say; a rule or target that cannot work is refused here with what would.
     /// </summary>
-    static string QueueRule(DebugCommandContext d)
+    string QueueRule(DebugCommandContext d)
     {
         var parts = d.Field.Split(',', StringSplitOptions.TrimEntries);
-        if (parts[0].Length == 0) return "type a rule name";
+        if (_latest is not { } system) return NoWorld;
+        if (parts[0].Length == 0) return "type a rule name: " + string.Join(", ", system.Debug.Rules.Select(r => $"{r.Name} [{r.Takes}]"));
 
-        d.Enqueue(new FireRuleCommand(parts[0], parts.Length > 1 ? parts[1] : null) { Tick = d.Tick + 1 });
-        return $"{parts[0]} queued";
+        string? target = parts.Length > 1 && parts[1].Length > 0 ? parts[1] : null;
+        if (system.Debug.CheckRule(parts[0], target) is { } wrong) return wrong;
+
+        d.Enqueue(new FireRuleCommand(parts[0], target) { Tick = d.Tick + 1 });
+        return $"{parts[0]} queued on {target ?? "its first target"}: unpause, then see 'Rivalry: log'";
     }
 
     /// <summary>
@@ -139,13 +165,19 @@ public sealed class RivalryMod : IMod, IRivalryApi, IModDependents
         return $"visit of {parts[0]} to {town ?? "the first town"} queued";
     }
 
-    static string QueueGrudge(DebugCommandContext d)
+    /// <summary>
+    /// Queues a grudge of a faction against the selected characters; an unknown faction is refused here.
+    /// </summary>
+    string QueueGrudge(DebugCommandContext d)
     {
         var parts = d.Field.Split(',', StringSplitOptions.TrimEntries);
+        if (_latest is not { } system) return NoWorld;
         if (parts[0].Length == 0 || d.Selected.Count == 0) return "select characters and type a faction name";
+        if (system.FactionByName(parts[0]) < 0) return $"no faction '{parts[0]}': type its name as the game shows it, or its record id";
+
         float amount = parts.Length > 1 && float.TryParse(parts[1], NumberStyles.Float, CultureInfo.InvariantCulture, out float a) ? a : 100;
         d.Enqueue(new GrudgeCommand(d.Selected, parts[0], amount) { Tick = d.Tick + 1 });
-        return $"{parts[0]}: +{amount} grudge on {d.Selected.Count} character(s)";
+        return $"{parts[0]}: {amount:+0.#;-0.#} grudge on {d.Selected.Count} character(s): unpause, then see 'Rivalry: character'";
     }
 
     /// <summary>One status line from the latest report (read on the host's thread: the report and history are immutable snapshots).</summary>
