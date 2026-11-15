@@ -15,6 +15,13 @@ same from a terminal.
 
 A new mod is one `PlayMod` line in `Play/Play.csproj`.
 
+## The Meitou launcher
+
+The second launch profile, "Meitou launcher (installed)" (pick it in the drop-down beside the start button), builds and deploys the mods as
+above, then opens the launcher installed from the Meitou releases (`%LOCALAPPDATA%\MeitouLauncher\current\meitou-launcher.exe`) instead of
+the game. Use it to change the mod list or load order (`data/mods.cfg`) or to trust a new mod's code. Its Play button starts the release it
+installed, not this checkout's engine: close it and use "Play (engine + mods)" to test. Visual Studio only; `dotnet run` uses the first profile.
+
 ## Settings
 
 Defaults: game `C:\Program Files (x86)\Steam\steamapps\common\Kenshi`, mods folder `<game>\mods`. Change them with the `KENSHI_PATH`
@@ -36,7 +43,7 @@ The engine finds the game on its own (Steam); `KenshiDir` set only in the props 
 
 ## First run
 
-- Set `Play` as the startup project if Visual Studio didn't pick it (right-click > Set as Startup Project); its one launch profile is
+- Set `Play` as the startup project if Visual Studio didn't pick it (right-click > Set as Startup Project); its default launch profile is
   "Play (engine + mods)".
 - Enable the mods in the game's launcher and trust their code in Meitou's launcher (docs/modding.md in the engine).
 - Steam normally leaves its Program Files folder writable without admin (unchecked here). If the copy fails with "access denied",
