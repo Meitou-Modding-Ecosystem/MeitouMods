@@ -119,8 +119,9 @@ unload (the carrier and captive then travel as a stand-in or not at all), and wh
 
 1. **Travelling** (5): on the road for the distance from the faction's nearest base to the quarry over `HuntTravelUnitsPerHour` (2727: the
    original's off-screen travel speed 25 per second over its 1200/11 s game hour), clamped to `HuntTravelMinHours` (1) and the setting
-   `HuntTravelMaxHours` (48; 0 skips the road). Base: the nearest town the faction owns, else the nearest town named in `home` (`|`-separated,
-   any case), else `HuntTravelFallbackHours` (12).
+   `HuntTravelMaxHours` (48; 0 skips the road). Base: the faction's nearest base ([factions](factions.md#bases): homes named in `Options.Homes`
+   or `home`, else owned towns, else towns that spawn its squads, else regions that do), else `HuntTravelFallbackHours` (12). The squad is homed
+   at that base's town (else the town nearest the quarry).
 2. **Spawning** (0): `SpawnPlatoon` in the ring round the quarry, beyond sight (1500 × vision) and inside the loaded 3 × 3 zones (4608 each),
    tried for 24 h; then **loading** (1): once in the world the squad is held, its skills rolled, its leader named (see "Rival leaders"), its
    evidence planted, and the quarry marked TEMP_ENEMY.
@@ -266,6 +267,7 @@ A row with a field takes its values separated by commas, in the order below; spa
 | `Rivalry: assess now` | none | runs the inspection, rules and directors at the next step instead of waiting for the period |
 | `Rivalry: runs and rules` | none | the behaviours under way (id, behaviour, town, platoon, phase, end hour) and every rule's name |
 | `Rivalry: rival leaders` | none | each named leader's record and fate, and the leaders handed to the law |
+| `Rivalry: faction bases` | `faction` | how the faction's bases were found, their count and the five nearest the first player character |
 | `Rivalry: grudge on selected` | `faction[, amount]` | adds `amount` to the faction's grudge against each selected character |
 | `Rivalry: fire rule` | `rule[, target]` | starts the rule's behaviour on one target, skipping its switch, conditions, chance and cooldown |
 | `Rivalry: visit town` | `template, faction[, hours[, town]]` | starts `rivalry.visit` (see "Visit") |

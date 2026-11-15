@@ -76,17 +76,10 @@ public static class AshenHandVoice
     };
 
     /// <summary>
-    /// The towns the hunters set out from, the order owning none of its own: the Ashlands, where the dig is. **Unknown** whether the game names a town
-    /// so; none found, Rivalry Core uses its fallback travel time.
-    /// </summary>
-    public const string Home = "Black Desert City";
-
-    /// <summary>
-    /// Adds the names, lines and home to a hunt's arguments.
+    /// Adds the names and lines to a hunt's arguments.
     /// </summary>
     public static BehaviourArgs Voice(this BehaviourArgs args)
     {
-        args.Set("home", Home);
         args.Set("leaderNames", string.Join(RivalLeaders.ListSeparator, LeaderNames));
         foreach (var (kind, lines) in Lines) args.Set(kind, string.Join(RivalLeaders.ListSeparator, lines));
 

@@ -7,7 +7,7 @@ Code mods for [MeitouClient](https://github.com/TheIvoryDisaster/MeitouClient), 
 | Rivalry Core | `rivalry.core` | [docs/rivalry-core.md](docs/rivalry-core.md) |
 | The Ashen Hand | `ashen.hand` | [docs/ashen-hand.md](docs/ashen-hand.md) |
 
-Planned work: [docs/roadmap.md](docs/roadmap.md).
+Planned work: [docs/roadmap.md](docs/roadmap.md). Factions and where their squads come from: [docs/factions.md](docs/factions.md).
 
 ## Layout
 

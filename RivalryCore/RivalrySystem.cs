@@ -146,6 +146,23 @@ public sealed partial class RivalrySystem : ICombatHitObserver, IStateHashed, IM
     }
 
     /// <summary>
+    /// Where a faction (its name or string id) sends squads from, as a line for the debug row: how the bases were found and the nearest few to the
+    /// player's first character.
+    /// </summary>
+    public string DescribeBases(string factionName)
+    {
+        int faction = FactionByName(factionName);
+        if (faction < 0) return $"no faction {factionName}";
+
+        var bases = FactionBases.Of(_data, faction, FactionBases.NamesFor(_data, faction, _settings, []));
+        if (bases.Count == 0) return $"{_data.Factions[faction].Name}: no base found; hit squads take {_settings.HuntTravelFallbackHours:0.#} h";
+
+        var at = Report.Characters.FirstOrDefault() is { } c ? new System.Numerics.Vector2(c.Position.X, c.Position.Z) : default;
+        var nearest = bases.OrderBy(b => System.Numerics.Vector2.Distance(b.Position, at)).Select(b => b.Label).Distinct().Take(5);
+        return $"{_data.Factions[faction].Name}: {bases.Count} {bases[0].Source} bases; nearest: {string.Join(", ", nearest)}";
+    }
+
+    /// <summary>
     /// Steps the behaviours under way and publishes their lines.
     /// </summary>
     void StepRuns(World world)

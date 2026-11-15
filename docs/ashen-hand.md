@@ -30,8 +30,9 @@ a log of days spent watching a mark. Right-clicked in a player character's inven
 Every member of a hunter squad is the same Ashen Hand Hunter; its leader takes a name from `AshenHandVoice.LeaderNames` and keeps it in
 Rivalry Core's [rival roster](rivalry-core.md#rival-leaders) until it dies, is jailed or recruited, so a leader the player beats or leaves for
 dead can come back, and speaks of the last fight (`AshenHandVoice.Lines`: original starter lines for each outcome, a predecessor handed to the
-law, first words, the distracted and engage lines). `home` is "Black Desert City": **Unknown** whether the game names a town so; when none
-matches, the squad's road takes Rivalry Core's fallback (12 h). Handing a leader to the law alive (carried to a lawful cage, or its bounty
+law, first words, the distracted and engage lines). Owning no town, the order names its homes in Rivalry Core's `Options.Homes`: the Ashlands
+region and Cat-Lon's Exile, the Second Empire exiles' town there ([factions](factions.md#bases); **Unknown** whether the region's BIOME_GROUP is
+named "Ashlands"). With neither found, the squad's road takes Rivalry Core's fallback (12 h). Handing a leader to the law alive (carried to a lawful cage, or its bounty
 claimed) wipes the order's grudges.
 
 ## Data file

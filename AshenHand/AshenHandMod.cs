@@ -25,6 +25,13 @@ public sealed class AshenHandMod : IMod
     public const double ThiefGoal = 1000, ThiefCooldownHours = 72, HunterCooldownHours = 48;
 
     /// <summary>
+    /// Where the order's squads set out from, owning no town (Rivalry Core's <see cref="RivalryOptions.Homes"/>): the Ashlands region, where the dig is,
+    /// and Cat-Lon's Exile, the Second Empire exiles' town there. A region name matches a BIOME_GROUP's name; **Unknown** whether the game's is
+    /// "Ashlands", so the town is listed too.
+    /// </summary>
+    public const string Homes = "Ashlands|Cat-Lon's Exile";
+
+    /// <summary>
     /// The player's settings.
     /// </summary>
     public AshenHandSettings Settings { get; } = new();
@@ -35,6 +42,7 @@ public sealed class AshenHandMod : IMod
         if (c.Data.Find(AshenHandData.Faction) is null) c.LogError("AshenHand.mod has no records: generate it (docs/ashen-hand.md \"Data file\").");
 
         var rivalry = c.Dependency<IRivalryApi>(RivalryMod.Id) ?? throw new InvalidOperationException("The Ashen Hand needs Rivalry Core.");
+        rivalry.Options.Homes[AshenHandData.Faction] = Homes;
         Register(rivalry.For(c.Id), Settings);
         c.AddItemUse(AshenHandData.Ledger, Evidence.Use);
     }
