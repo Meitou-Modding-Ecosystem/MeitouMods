@@ -187,13 +187,16 @@ function StepBeta {
     $forkHead = InEngine { GitOut rev-parse origin/fork }
     Git fetch --quiet origin beta
 
-    $pinned = (GitOut ls-tree origin/beta engine).Split()[2]
-    if ($pinned -eq $forkHead) {
-        Write-Host 'beta already pins fork''s head.' -ForegroundColor Green
+    # fork first: a pin of fork's head means nothing while fork lacks upstream's newest commits.
+    if (InEngine { -not (IsAncestor origin/master origin/fork) }) {
+        Write-Host 'fork is behind master (upstream has new commits): run -Step Fork and merge its PR first.' -ForegroundColor Yellow
         return
     }
-    if (InEngine { -not (IsAncestor origin/master origin/fork) }) {
-        throw 'fork does not hold master yet: merge the sync PR into fork first (-Step Fork).'
+
+    $pinned = (GitOut ls-tree origin/beta engine).Split()[2]
+    if ($pinned -eq $forkHead) {
+        Write-Host 'beta already pins fork''s head, which holds upstream.' -ForegroundColor Green
+        return
     }
     if ([bool](GitOut status --porcelain --untracked-files=no -- . ':!engine')) {
         throw 'MeitouMods has uncommitted changes: commit or discard them first.'
