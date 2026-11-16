@@ -372,4 +372,138 @@ public class RivalryCoreTests
         world.RunTicks(2);
         Assert.Contains(system.History, l => l.Contains("hunt: 1 Foes squad(s) already near Me"));   // the miss claimed no cooldown
     }
+
+    #region Party caps
+
+    /// <summary>
+    /// A behaviour of a party kind whose run lasts 500 game hours.
+    /// </summary>
+    sealed class Sending(string name, PartyKind kind) : IBehaviour
+    {
+        public string Name => name;
+
+        public PartyKind Party => kind;
+
+        public string Start(BehaviourContext context, BehaviourRequest request)
+        {
+            var run = context.Begin(this, request, context.World.GameHours + 500);
+            return $"sent as run {run.Id}";
+        }
+
+        public bool Step(BehaviourContext context, BehaviourRun run) => context.World.GameHours < run.Until;
+    }
+
+    /// <summary>
+    /// A rule on the player's towns that starts <paramref name="behaviour"/> with Foes acting, once per 1000 h, while <paramref name="when"/>
+    /// holds (null: always).
+    /// </summary>
+    static Rule Sends(string name, string behaviour, Func<bool>? when = null) => new()
+    {
+        Name = name,
+        Behaviour = behaviour,
+        When = (_, _) => when?.Invoke() != false,
+        CooldownHours = _ => 1000,
+        Faction = (a, _) => a.Data.FactionIndex("61-a"),
+    };
+
+    /// <summary>
+    /// A world with a standing player character and Rivalry Core's own rules off, so only the dependent's rules send parties.
+    /// </summary>
+    static (SimWorld World, RivalrySystem System) MakeSending(Action<IRivalryRegistry> register)
+    {
+        var (world, system, options) = Make(Data(), register: register);
+        options.Reinforcements = options.OpportunistRaids = options.Hunters = false;
+        Spawn(world, "Me", world.Player.Faction, TownAt);
+        return (world, system);
+    }
+
+    [Fact]
+    public void Two_mods_hostile_rules_send_one_party_and_the_held_rule_keeps_its_cooldown()
+    {
+        var (world, system) = MakeSending(r =>
+        {
+            r.AddBehaviour(new Sending("test.raiders", PartyKind.Hostile));
+            r.AddRule(Sends("test.first", "test.raiders"));
+            r.AddRule(Sends("test.second", "test.raiders"));
+        });
+
+        world.RunTicks(2);
+
+        Assert.Equal("test.first", Assert.Single(system.Parties).Source);
+        Assert.DoesNotContain(system.Debug.Cooldowns, c => c.Key.StartsWith("test.second", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Only_an_override_sends_a_second_hostile_party()
+    {
+        var (world, system) = MakeSending(r =>
+        {
+            r.AddBehaviour(new Sending("test.raiders", PartyKind.Hostile));
+            r.AddRule(Sends("test.first", "test.raiders"));
+            r.AddRule(Sends("test.second", "test.raiders"));
+            r.ExceedHostileCap("test.second", 1, "a siege brings its own scouts");
+        });
+
+        world.RunTicks(2);
+
+        Assert.Equal(2, system.PartiesOut(PartyKind.Hostile));
+        Assert.Contains("test.second +1", system.Debug.DescribeParties());
+    }
+
+    [Fact]
+    public void Friendly_parties_stop_at_the_setting()
+    {
+        var (world, system) = MakeSending(r =>
+        {
+            r.AddBehaviour(new Sending("test.guests", PartyKind.Friendly));
+            for (int i = 0; i < 5; i++) r.AddRule(Sends($"test.guests{i}", "test.guests"));
+        });
+
+        world.RunTicks(2);
+
+        Assert.Equal(3, system.PartiesOut(PartyKind.Friendly));   // the default of "Friendly parties at once"
+        Assert.Equal(0, system.PartiesOut(PartyKind.Hostile));
+    }
+
+    [Fact]
+    public void Another_mods_claim_takes_the_hostile_slot_until_released()
+    {
+        bool tempted = false;
+        var (world, system) = MakeSending(r =>
+        {
+            r.AddBehaviour(new Sending("test.raiders", PartyKind.Hostile));
+            r.AddRule(Sends("test.raid", "test.raiders", () => tempted));
+        });
+        world.RunTicks(1);
+        var claim = new PartyClaim("twr.bounty", PartyKind.Hostile, "Me", 100);
+        Assert.True(system.ClaimParty(claim));
+        Assert.False(system.ClaimParty(claim with { Source = "twr.reprisal" }));   // the cap is full
+
+        tempted = true;
+        world.Commands.Enqueue(new AssessNowCommand { Tick = world.Tick });
+        world.RunTicks(2);
+        Assert.Equal("twr.bounty", Assert.Single(system.Parties).Source);
+
+        Assert.True(system.ReleaseParty("twr.bounty", "Me"));
+        world.Commands.Enqueue(new AssessNowCommand { Tick = world.Tick });
+        world.RunTicks(2);
+        Assert.Equal("test.raid", Assert.Single(system.Parties).Source);
+    }
+
+    [Fact]
+    public void A_claim_comes_back_from_a_save_and_still_holds_the_slot()
+    {
+        var (world, system) = MakeSending(_ => { });
+        world.RunTicks(1);
+        Assert.True(system.ClaimParty(new PartyClaim("twr.bounty", PartyKind.Hostile, "Me", 100)));
+
+        var (world2, system2) = MakeSending(_ => { });
+        system2.Read(Saved(system));
+        world2.RunTicks(1);
+
+        Assert.Equal(1, system2.PartiesOut(PartyKind.Hostile));
+        Assert.False(system2.ClaimParty(new PartyClaim("twr.reprisal", PartyKind.Hostile, "Me", 100)));
+    }
+
+    #endregion
 }
