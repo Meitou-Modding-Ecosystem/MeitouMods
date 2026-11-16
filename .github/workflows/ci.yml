@@ -1,29 +1,14 @@
-# Builds every mod against the pinned engine and runs the mods' tests, on PRs to beta and main and on pushes to them.
 name: CI
-
 on:
   pull_request:
     branches: [beta, main]
   push:
     branches: [beta, main]
-
 permissions:
   contents: read
-
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v5
-        with:
-          submodules: recursive
-
-      - uses: actions/setup-dotnet@v5
-        with:
-          dotnet-version: 11.0.x
-
-      - name: Build
-        run: dotnet build -c Release
-
-      - name: Test
-        run: dotnet test -c Release --no-build
+    uses: TheIvoryDisaster/GutenStructure/.github/workflows/build-dotnet.yml@fc0507fb376b8b8ba732795c7032c9cd81464a58
