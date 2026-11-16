@@ -10,6 +10,9 @@ Code mods for [MeitouClient](https://github.com/Meitou-Modding-Ecosystem/MeitouC
 
 Planned work: [docs/roadmap.md](docs/roadmap.md). Factions and where their squads come from: [docs/factions.md](docs/factions.md).
 
+Works alongside: [The Wasteland Remembers](docs/wasteland-remembers.md) (a separate mod on the Steam Workshop; town heat, bounty hunters, rivals,
+outlaws and town talk, with a public API: [docs/wasteland-remembers-api.md](docs/wasteland-remembers-api.md)).
+
 ## Layout
 
 - `engine/`: MeitouClient as a git submodule, pinned to the commit the mods build against. Until the world hooks are merged upstream it
