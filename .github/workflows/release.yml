@@ -13,7 +13,7 @@ jobs:
   release-gate:
     permissions:
       contents: read
-    uses: TheIvoryDisaster/GutenStructure/.github/workflows/release-gate.yml@2e1bbd10b3a4f291fe0cf2a271252d6d758df285
+    uses: TheIvoryDisaster/GutenStructure/.github/workflows/release-gate.yml@e73b5dbfe02899b662a66cce5a35613bcece3919
   release:
     needs: release-gate
     runs-on: ubuntu-latest
