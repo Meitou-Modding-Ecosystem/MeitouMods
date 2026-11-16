@@ -15,8 +15,8 @@ outlaws and town talk, with a public API: [docs/wasteland-remembers-api.md](docs
 
 ## Layout
 
-- `engine/`: MeitouClient as a git submodule, pinned to the commit the mods build against. Until the world hooks are merged upstream it
-  points at the fork's hooks branch.
+- `engine/`: MeitouClient as a git submodule, pinned to the commit the mods build against: the head of the fork's `fork` branch (upstream
+  plus fork-only CI and mod API).
 - `<Mod>/`: the mod's project and `meitou.json`. `<Mod>.Tests/`: its tests (synthetic worlds, no game install needed).
 - `Directory.Build.props` imports the engine's, so mods build with the game's settings (warnings are errors).
 
@@ -41,6 +41,9 @@ git checkout beta
 git pull
 git submodule update --init --recursive
 ```
+
+Pulling upstream MeitouClient in: `pwsh tools/Sync-Upstream.ps1` (upstream -> engine `master` -> `fork` -> `beta` -> `main`, one PR per step;
+run it again after each merge, `-Abort` drops an unfinished merge; details at the top of the script).
 
 ## Branches and releases
 
