@@ -40,6 +40,10 @@ public sealed class RivalryOptions
     [Setting("Reinforce below balance", Hint = "Defence over threat in a town under attack at which allies come (1 = even).", Min = 0.1, Max = 2, Step = 0.05)]
     public float ReinforceBelowBalance { get; set; } = 0.75f;
 
+    [Setting("Friendly parties at once", Hint = "Allied or visiting parties that may come to you at the same time. Hostile ones come one at a time.",
+        Min = Parties.FriendlyMin, Max = Parties.FriendlyMax, Step = 1)]
+    public int FriendlyPartiesAtOnce { get; set; } = 3;
+
     [Setting("Opportunist raid chance per day", Min = 0, Max = 2, Step = 0.05)]
     public float RaidChancePerDay { get; set; } = 0.25f;
 

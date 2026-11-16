@@ -16,6 +16,16 @@ public interface IBehaviour
     string Name { get; }
 
     /// <summary>
+    /// What a start of it sends at the player, counted under the party caps (docs/rivalry-core.md "Party caps"); none: not capped.
+    /// </summary>
+    PartyKind Party => PartyKind.None;
+
+    /// <summary>
+    /// Whether a run of it still counts as a party out (a hit squad in its aftermath no longer does); every run by default.
+    /// </summary>
+    bool Underway(BehaviourRun run) => true;
+
+    /// <summary>
     /// Starts it for a target; returns a log line saying what happened.
     /// </summary>
     string Start(BehaviourContext context, BehaviourRequest request);

@@ -45,6 +45,7 @@ public sealed partial class RivalrySystem : ICombatHitObserver, IStateHashed, IM
     readonly Actions _actions;
     readonly RuleEngine _rules;
     readonly BehaviourRuns _runs;
+    readonly Parties _parties;
     readonly PopulationSystem? _population;
     readonly HunterBarks _barks;
     readonly SquadMemory? _memory;
@@ -71,10 +72,12 @@ public sealed partial class RivalrySystem : ICombatHitObserver, IStateHashed, IM
         _population = context.Find<PopulationSystem>();
         _catalogue = new Catalogue(_data, _population);
         _memory = context.Find<DialogueSystem>()?.Memory;
-        _actions = new Actions(_data, _population, _memory, Notoriety, _catalogue);
+        var behaviours = registry.Behaviours.ToDictionary(e => e.Name, e => e.Value, StringComparer.Ordinal);
+        _parties = new Parties(behaviours, [.. registry.Overrides.Select(e => e.Value)]);
+        _actions = new Actions(_data, _population, _memory, Notoriety, _catalogue, _parties);
         _barks = new HunterBarks(context.Find<CombatSystem>());
         _rules = new RuleEngine(registry, log);
-        _runs = new BehaviourRuns(_data, registry.Behaviours.ToDictionary(e => e.Name, e => e.Value, StringComparer.Ordinal), log);
+        _runs = new BehaviourRuns(_data, behaviours, log);
     }
 
     /// <summary>
@@ -105,6 +108,11 @@ public sealed partial class RivalrySystem : ICombatHitObserver, IStateHashed, IM
     /// The behaviours under way, as lines; a copy, safe to read from the host's thread.
     /// </summary>
     public IReadOnlyList<string> Runs { get; private set; } = [];
+
+    /// <summary>
+    /// The parties out, hostile and friendly (docs/rivalry-core.md "Party caps"); a copy, safe to read from the host's thread.
+    /// </summary>
+    public IReadOnlyList<PartyView> Parties { get; private set; } = [];
 
     /// <summary>
     /// What the debug rows read: a copy, safe to read from the host's thread.
@@ -155,7 +163,7 @@ public sealed partial class RivalrySystem : ICombatHitObserver, IStateHashed, IM
     void PublishView(World world)
     {
         _viewDue = false;
-        Debug = DebugView.Build(world, _data, Report, Notoriety, _cooldowns, _runs.All, Rivals, _rules.Views, _options, _memory);
+        Debug = DebugView.Build(world, _data, Report, Notoriety, _cooldowns, _runs.All, Rivals, _rules.Views, _options, _memory, _parties);
     }
 
     void AddGrudge(GrudgeCommand g)
@@ -217,6 +225,7 @@ public sealed partial class RivalrySystem : ICombatHitObserver, IStateHashed, IM
     /// </summary>
     void PublishRuns()
     {
+        if (_world is { } world) Parties = [.. _parties.Out(_runs.All, Report, world.GameHours)];
         if (_runs.All.Count == 0 && Runs.Count == 0) return;
 
         Runs = [.. _runs.All.Select(r => $"run {r.Id} {r.Behaviour} town {r.Town} platoon {r.Platoon} phase {r.Phase} until {r.Until:0.#} h")];
@@ -233,12 +242,21 @@ public sealed partial class RivalrySystem : ICombatHitObserver, IStateHashed, IM
         var decided = new List<Decision>();
         foreach (var command in _asked)
         {
-            if (command is FireRuleCommand fire) Remember($"debug: {_rules.Fire(NewAssessment(world), fire.Rule, TownKey(fire.Key), decided, _cooldowns)}");
+            if (command is FireRuleCommand fire) Fire(world, fire, decided);
             else if (command is StartBehaviourCommand start) Start(start, decided);
         }
 
         _asked.Clear();
-        foreach (var decision in decided) Carry(world, decision);
+        foreach (var decision in decided) Carry(world, decision, capped: false);
+    }
+
+    /// <summary>
+    /// A debug row's rule fired, whatever its conditions, cooldown and the party caps say.
+    /// </summary>
+    void Fire(World world, FireRuleCommand fire, List<Decision> decided)
+    {
+        string line = _rules.Fire(NewAssessment(world, decided), fire.Rule, TownKey(fire.Key), decided, _cooldowns);
+        Remember($"debug: {line} (party caps skipped)");
     }
 
     /// <summary>
@@ -284,21 +302,26 @@ public sealed partial class RivalrySystem : ICombatHitObserver, IStateHashed, IM
         Notoriety.Cool(world.Characters, hours, _options.GrudgeCoolPerHour);
         _cooldowns.Expire(world.GameHours);
         Report = _inspector.Inspect(world);
+        _parties.Expire(Report, world.GameHours);
         if (Report.PlayerFaction < 0) return;
 
         var decided = Decide(world);
-        foreach (var decision in decided) Carry(world, decision);
+        foreach (var decision in decided) Carry(world, decision, capped: true);
     }
 
-    Assessment NewAssessment(World world) => new(world, _data, Report, Notoriety, _options, _purpose, _catalogue, Rivals, _runs.All);
+    /// <summary>
+    /// What the rules and directors see; <paramref name="pending"/> holds the decisions recorded so far, which count as parties out.
+    /// </summary>
+    Assessment NewAssessment(World world, IReadOnlyList<Decision> pending) =>
+        new(world, _data, Report, Notoriety, _options, _purpose, _catalogue, Rivals, _runs.All, _parties, pending);
 
     BehaviourContext Context(World world) =>
         new(world, _data, Report, _options, _purpose, _actions, _runs, _population, _inspector, Notoriety, Rivals);
 
     List<Decision> Decide(World world)
     {
-        var assessment = NewAssessment(world);
         var decided = new List<Decision>();
+        var assessment = NewAssessment(world, decided);
         _rules.Evaluate(assessment, decided, _cooldowns);
         foreach (var director in _directors)
         {
@@ -316,8 +339,18 @@ public sealed partial class RivalrySystem : ICombatHitObserver, IStateHashed, IM
         return decided;
     }
 
-    void Carry(World world, Decision decision)
+    /// <summary>
+    /// Carries out a decision and logs it; <paramref name="capped"/>: one that would send a party over its kind's cap is held instead (the debug
+    /// rows' asks are not capped).
+    /// </summary>
+    void Carry(World world, Decision decision, bool capped)
     {
+        if (capped && HeldLine(world, decision) is { } held)
+        {
+            Remember($"{decision.Director}: {held}");
+            return;
+        }
+
         string line;
         try
         {
@@ -333,12 +366,56 @@ public sealed partial class RivalrySystem : ICombatHitObserver, IStateHashed, IM
         PublishRuns();
     }
 
+    /// <summary>
+    /// Why the decision is held by its party cap; null when it may go.
+    /// </summary>
+    string? HeldLine(World world, Decision decision)
+    {
+        var kind = _parties.KindOf(decision);
+        if (kind == PartyKind.None) return null;
+
+        int count = _parties.Count(kind, _runs.All, Report, world.GameHours);
+        if (_parties.Admits(kind, decision.Director, count, _options)) return null;
+
+        string what = decision is StartDecision s ? s.Behaviour : KindName(decision);
+        return $"held: {what} would be {kind.ToString().ToLowerInvariant()} party {count + 1} of {Rivalry.Parties.Cap(kind, _options)}";
+    }
+
+    /// <summary>
+    /// A decision's type as a word (<c>HuntDecision</c>: hunt).
+    /// </summary>
+    static string KindName(Decision decision) => decision.GetType().Name.Replace("Decision", "", StringComparison.Ordinal).ToLowerInvariant();
+
     void Remember(string line)
     {
         _log(line);
         _history.Add(line);
         if (_history.Count > HistoryLength) _history.RemoveAt(0);
         History = [.. _history];
+    }
+
+    /// <summary>
+    /// How many parties of the kind are out now. Serial steps only.
+    /// </summary>
+    public int PartiesOut(PartyKind kind) => _world is { } world ? _parties.Count(kind, _runs.All, Report, world.GameHours) : 0;
+
+    public int PartyCap(PartyKind kind) => Rivalry.Parties.Cap(kind, _options);
+
+    public bool ClaimParty(PartyClaim claim)
+    {
+        ArgumentNullException.ThrowIfNull(claim);
+        if (_world is not { } world || claim.Kind == PartyKind.None || claim.Hours <= 0) return false;
+
+        bool held = _parties.Claim(claim, PartiesOut(claim.Kind), _options, world.GameHours);
+        PublishRuns();
+        return held;
+    }
+
+    public bool ReleaseParty(string source, string key)
+    {
+        bool released = _parties.Release(source, key);
+        PublishRuns();
+        return released;
     }
 
     public void Hash(ref StateHasher h)
@@ -350,5 +427,6 @@ public sealed partial class RivalrySystem : ICombatHitObserver, IStateHashed, IM
         HashVictims(ref h);
         _runs.Hash(ref h);
         Rivals.Hash(ref h);
+        _parties.Hash(ref h);
     }
 }

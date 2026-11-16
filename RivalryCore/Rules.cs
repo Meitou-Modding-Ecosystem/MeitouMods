@@ -2,8 +2,9 @@ namespace Rivalry;
 
 /// <summary>
 /// Evaluates the rules at an assessment (docs/rivalry-core.md "Rules"): for each rule, in the order added, and each target of its kind, in the
-/// kind's order: not cooling, every condition holds, the chance roll passes, a faction is found when the rule names one; then the cooldown is
-/// claimed and the behaviour's start is recorded. A rule that throws is logged and off for the rest of that world.
+/// kind's order: not cooling, every condition holds, the chance roll passes, the party cap admits one more of its behaviour's kind, a faction is
+/// found when the rule names one; then the cooldown is claimed and the behaviour's start is recorded. A rule that throws is logged and off for
+/// the rest of that world.
 /// </summary>
 internal sealed class RuleEngine(Registry registry, Action<string> log)
 {
@@ -95,10 +96,12 @@ internal sealed class RuleEngine(Registry registry, Action<string> log)
     {
         float? chance = rule.ChancePerDay?.Invoke(a.Options) * a.Options.AssessEveryHours / 24f;
         double cooldown = rule.CooldownHours(a.Options);
+        var kind = a.KindOf(rule.Behaviour);
         foreach (var target in TargetsOf(a, rule))
         {
             if (d.Cooling(target.Key) || !Holds(a, rule, target)) continue;
             if (chance is { } c && a.Roll($"{rule.Name}/{target.Key}") >= c) continue;
+            if (!a.MayStart(kind, rule.Name)) continue;
             if (WithFaction(a, rule, target) is not { } aimed || !d.TryClaim(target.Key, cooldown)) continue;
 
             Record(a, rule, aimed, d);
