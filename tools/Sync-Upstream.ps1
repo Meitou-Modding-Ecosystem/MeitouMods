@@ -41,21 +41,24 @@ $EngineUrl = "https://github.com/$Org/MeitouClient.git"
 $UpstreamUrl = 'https://github.com/VlcekM/MeitouClient.git'
 $Date = Get-Date -Format 'yyyy-MM-dd'
 
+# The git program itself: PowerShell names are case-insensitive, so a bare `git` inside the `Git` helper below would call the helper again.
+$GitExe = (Get-Command git -CommandType Application -ErrorAction Stop)[0].Source
+
 function Git {
     # Runs git and stops the script on failure, with git's own message.
-    & git @args
+    & $GitExe @args
     if ($LASTEXITCODE -ne 0) { throw "git $($args -join ' ') failed (exit $LASTEXITCODE)" }
 }
 
 function GitOut {
     # Runs git and returns its trimmed output; stops on failure.
-    $out = & git @args
+    $out = & $GitExe @args
     if ($LASTEXITCODE -ne 0) { throw "git $($args -join ' ') failed (exit $LASTEXITCODE)" }
     return ($out -join "`n").Trim()
 }
 
 function IsAncestor([string]$a, [string]$b) {
-    & git merge-base --is-ancestor $a $b
+    & $GitExe merge-base --is-ancestor $a $b
     return $LASTEXITCODE -eq 0
 }
 
@@ -64,7 +67,7 @@ function HasGh { return [bool](Get-Command gh -ErrorAction SilentlyContinue) }
 function OpenPr([string]$repo, [string]$base, [string]$head, [string]$title, [string]$body) {
     # Opens a PR with gh when it is installed (or prints the existing one); else prints the compare link.
     if (-not (HasGh)) {
-        Write-Host "Open the PR: https://github.com/$Org/$repo/compare/$base...$head?expand=1" -ForegroundColor Yellow
+        Write-Host "Open the PR: https://github.com/${Org}/${repo}/compare/${base}...${head}?expand=1" -ForegroundColor Yellow
         return
     }
     $existing = & gh pr list --repo "$Org/$repo" --base $base --head $head --state open --json url --jq '.[0].url'
@@ -90,7 +93,7 @@ function InEngine([scriptblock]$body) {
 
 function EnsureEngineRemotes {
     InEngine {
-        $remotes = @(& git remote)
+        $remotes = @(& $GitExe remote)
         if ($remotes -notcontains 'origin') { Git remote add origin $EngineUrl } else { Git remote set-url origin $EngineUrl }
         if ($remotes -notcontains 'upstream') { Git remote add upstream $UpstreamUrl } else { Git remote set-url upstream $UpstreamUrl }
         Git fetch --quiet upstream master
@@ -162,7 +165,7 @@ function StepFork {
             if (EngineDirty) { throw 'engine/ has uncommitted changes: commit or discard them first.' }
 
             Git checkout --quiet -B $branch origin/fork
-            & git merge --no-ff --no-edit origin/master -m "Merge master (upstream $(GitOut rev-parse --short origin/master)) into fork"
+            & $GitExe merge --no-ff --no-edit origin/master -m "Merge master (upstream $(GitOut rev-parse --short origin/master)) into fork"
             if ($LASTEXITCODE -ne 0) {
                 $conflicts = GitOut diff --name-only --diff-filter=U
                 Write-Host "Merging master into fork conflicts in:`n$conflicts" -ForegroundColor Red
