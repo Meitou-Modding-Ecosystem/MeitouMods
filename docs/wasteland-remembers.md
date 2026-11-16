@@ -1,14 +1,16 @@
 # The Wasteland Remembers (companion mod)
 
-**Status: released on the Steam Workshop (build 20261115ai); the API below is in build 20261115aj and later (version 2, news, from 20261116ak). Not in this repo:** its source lives in its author's own repo;
+**Status: released on the Steam Workshop (build 20261115ai); the API below is in build 20261115aj and later (version 2, news, from 20261116ak; version 3 from 20261116ap, not on Steam yet). Not in this repo:** its source lives in its author's own repo
+([Meitou-Modding-Ecosystem/TheWastelandRemembers](https://github.com/Meitou-Modding-Ecosystem/TheWastelandRemembers); the newest build is in its open PR);
 this page and [wasteland-remembers-api.md](wasteland-remembers-api.md) are what other mods need to work alongside it. Owner: @aaallleeeccc.
 
 The Wasteland Remembers (TWR) is a Meitou-only Kenshi mod: a world that notices the player and remembers. Below: what TWR does (so the mods
 here don't do it twice), how to talk to it, what is planned for working together, and what its play tests taught about Meitou's engine.
 
 - Steam Workshop: https://steamcommunity.com/sharedfiles/filedetails/?id=3839368189
-- Supports MeitouClient 0.17.3 up to (not including) 0.21.0. Played on 0.20.0; builds and loads checked on 0.20.1.
-- The API is in build 20261115aj and later; version 2 (`Report`, news from other mods) from 20261116ak.
+- Supports MeitouClient 0.17.3 up to (not including) 0.21.0. Played on 0.20.0; builds and loads checked on 0.17.3 to v0.20.2-nightly.20261116.2.
+- The API is in build 20261115aj and later; version 2 (`Report`, news from other mods) from 20261116ak; version 3 (`SendHunters`,
+  `LeaveAlone`) from 20261116ap.
 
 ## What TWR does (and so what other mods shouldn't do twice)
 
@@ -24,7 +26,7 @@ here don't do it twice), how to talk to it, what is planned for working together
 | Squad record | Kills by faction, titles from deeds (75), history, the fallen, a Recap link. | Titles are readable through the API. |
 | Economy | Only alms, contract pay and bounties. No production, supply or garrisons. | Free ground for an economy mod. |
 
-## Talking to TWR: the API (version 2)
+## Talking to TWR: the API (version 3)
 
 A public static class, `LivingWasteland.MeitouMod.WastelandApi`, read by reflection so no mod depends on TWR. Full reference:
 [wasteland-remembers-api.md](wasteland-remembers-api.md). In short:
@@ -33,6 +35,7 @@ A public static class, `LivingWasteland.MeitouMod.WastelandApi`, read by reflect
 - Who is after the player: `Rivals()`, `Hunts()`, `HuntUnderway()`, `SendsHunters`
 - The squad's story: `SquadTitles()`, `Note(text)` (History tab), `Moment(caption, place, weight)` (BeatTheCount's Recap)
 - News (version 2): `Report(kind, place, faction, text, weight, source)`: towns near the place talk about it; see #23
+- Version 3: `SendHunters(town, reason)` (a crew now, #26) and `LeaveAlone(name, faction, source)` (your named characters never become TWR rivals, #25)
 
 Plain types only (strings, numbers, bools, lists of string-keyed dictionaries). Nothing throws; before a game loads, reads come back empty and
 writes return false. `Version` only grows; nothing is removed or changes meaning.
@@ -42,10 +45,11 @@ writes return false. `Version` only grows; nothing is removed or changes meaning
 1. **Incoming events (built in 20261116ak: `Report`, see #23).** Another mod reports something that happened (a town fell, a garrison grew, a town is short of food, a siege began,
    surplus squads set out); TWR turns it into town talk, rumours, the Atlas and Recap moments, near where it happened, so the world talks
    about it once.
-2. **One hunter at a time.** A shared rule for who sends squads after the player: check `SendsHunters` / `HuntUnderway()` before sending
-   your own, and a way for another mod to tell TWR to hold back.
-3. **Leaders left alone.** A way to tell TWR's rival picker to skip another mod's named leaders.
-4. **`SendHunters(town, reason)`.** A crew sent at once, without touching the town's heat (for a bank's debt enforcement and the like).
+2. **One hunter at a time (first step built in 20261116ao, see #24).** With Rivalry Core 0.6+ installed, TWR's bounty crews, reprisals and
+   hunting rivals claim its one hostile-party slot (`ClaimParty`, source `LivingWastelandMeitou.hunters`) and wait while another party is
+   out. Mods without Rivalry Core: check `SendsHunters` / `HuntUnderway()` before sending your own.
+3. **Leaders left alone (built in 20261116ap: `LeaveAlone`, see #25).** By name and faction until characters can carry a saved tag (#30).
+4. **`SendHunters(town, reason)` (built in 20261116ap, see #26).** A crew sent at once, without touching the town's heat.
 5. **Moving pursuers onto engine hooks.** Once MeitouClient PR #786 (SpawnPlatoon, HoldPlatoon) is in, TWR's crews, reprisals and rivals
    move onto it, with a fallback for older Meitou versions.
 
