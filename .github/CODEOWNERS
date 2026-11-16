@@ -15,6 +15,9 @@
 /Husbandry.Data/          @TheIvoryDisaster
 /docs/husbandry.md        @TheIvoryDisaster
 
+/docs/wasteland-remembers.md      @aaallleeeccc
+/docs/wasteland-remembers-api.md  @aaallleeeccc
+
 # Shared build, CI and the engine pin: maintainers.
 /.github/                 @TheIvoryDisaster
 /engine                   @TheIvoryDisaster
