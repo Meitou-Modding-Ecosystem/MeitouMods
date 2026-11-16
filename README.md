@@ -1,6 +1,6 @@
 # Meitou mods
 
-Code mods for [MeitouClient](https://github.com/TheIvoryDisaster/MeitouClient), one folder per mod. GPL-3.0-or-later.
+Code mods for [MeitouClient](https://github.com/Meitou-Modding-Ecosystem/MeitouClient), one folder per mod. GPL-3.0-or-later.
 
 | Mod | Id | Docs |
 | --- | --- | --- |

@@ -2,8 +2,8 @@
 
 **Status: proposed, mod version 0.5.0, code-mod API 2.** A code mod in `RivalryCore` (id `rivalry.core`) that lets the world's factions
 inspect the player's setup and act on it: hunt a character, raid a weak rich town, reinforce a town that is losing a fight. Not rival-only: the
-same pipeline sends allies to help and friendly visitors. Built on [dependencies](https://github.com/TheIvoryDisaster/MeitouClient/blob/master/docs/modding-dependencies.md); other mods add probes, conditions,
-target kinds, behaviours, rules and directors (see "Extension API"). Needs the engine hooks of [modding](https://github.com/TheIvoryDisaster/MeitouClient/blob/master/docs/modding.md) "World hooks".
+same pipeline sends allies to help and friendly visitors. Built on [dependencies](https://github.com/Meitou-Modding-Ecosystem/MeitouClient/blob/master/docs/modding-dependencies.md); other mods add probes, conditions,
+target kinds, behaviours, rules and directors (see "Extension API"). Needs the engine hooks of [modding](https://github.com/Meitou-Modding-Ecosystem/MeitouClient/blob/master/docs/modding.md) "World hooks".
 
 ## Pipeline
 
@@ -30,7 +30,7 @@ A throwing rule or director is logged and off for the rest of that world; a fail
 Engine choices (framework's own, not the original's): strength = mean of melee attack, melee defence, dexterity, toughness (10 without stats, 0
 while down); defence = defenders' strength + 15 per turret; hostile = faction relation ≤ -30 with the player, or a squad whose campaign war
 targets include the player. Item value = the game's base price (`Market.BaseValue`: quality, material, manufacturer) × quantity; **Observed** (2026-11-13, a new game
-without a base): the record's `value` field alone gave wealth 0. `rivalry.tempting` counts only what can be stolen (stored, carried), not buildings. Function numbers: [campaigns](https://github.com/TheIvoryDisaster/MeitouClient/blob/master/docs/game/factions-squads-towns.md#campaigns).
+without a base): the record's `value` field alone gave wealth 0. `rivalry.tempting` counts only what can be stolen (stored, carried), not buildings. Function numbers: [campaigns](https://github.com/Meitou-Modding-Ecosystem/MeitouClient/blob/master/docs/game/factions-squads-towns.md#campaigns).
 
 ## Notoriety
 
@@ -167,7 +167,7 @@ character on sight.
 
 | Decision | Carried out by |
 | --- | --- |
-| `Raid(faction, town, campaign?)` | `PopulationSystem.RequestCampaign` with an ASSAULT_TOWN campaign: the given one, else the faction's first hostile one (its `campaigns` list, then records whose `faction override` names it). The game's request rules then apply: world states and leader only, no chance, range or cooldown ([campaigns](https://github.com/TheIvoryDisaster/MeitouClient/blob/master/docs/game/factions-squads-towns.md#campaigns)) |
+| `Raid(faction, town, campaign?)` | `PopulationSystem.RequestCampaign` with an ASSAULT_TOWN campaign: the given one, else the faction's first hostile one (its `campaigns` list, then records whose `faction override` names it). The game's request rules then apply: world states and leader only, no chance, range or cooldown ([campaigns](https://github.com/Meitou-Modding-Ecosystem/MeitouClient/blob/master/docs/game/factions-squads-towns.md#campaigns)) |
 | `Reinforce(faction, town, campaign?, nearby)` | the same with a DEFEND_TOWN campaign (the "Ally ... (trigger)" records carry a `faction override`), and with `nearby` each of the faction's candidate squads within `ReinforceRadius` (8000) marks up to 16 of the town's hostiles TEMP_ENEMY and runs the defend package (`DefendPackage`, else the first AI_PACKAGE by id with signal 15, `Contract_DefendPlayerBase`) for `ReinforceHours` |
 | `Hunt(faction, target, squads, package?)` | the nearest candidate squads within `HuntRadius` (20000) mark the target TEMP_ENEMY (squad memory, so the aggro fights it on sight) and, given a package (`HuntPackage`), run it as a contract aimed at the target |
 | `Direct(squad, package, hours, target?)` | `StartContract` (dialogue's `AI contract`), deferred to the next tick |
