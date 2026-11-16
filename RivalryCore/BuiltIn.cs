@@ -149,6 +149,8 @@ public sealed class RaidBehaviour : IBehaviour
 {
     public string Name => BuiltIn.Raid;
 
+    public PartyKind Party => PartyKind.Hostile;
+
     public string Start(BehaviourContext context, BehaviourRequest request) => context.Apply(
         new RaidDecision(request.Source, request.Target.Faction, request.Target.Town, request.Args.Text("campaign"), (float)request.Args.Number("delay")));
 }
@@ -160,6 +162,8 @@ public sealed class RaidBehaviour : IBehaviour
 public sealed class ReinforceBehaviour : IBehaviour
 {
     public string Name => BuiltIn.Reinforce;
+
+    public PartyKind Party => PartyKind.Friendly;
 
     public string Start(BehaviourContext context, BehaviourRequest request) => context.Apply(new ReinforceDecision(
         request.Source, request.Target.Faction, request.Target.Town, request.Args.Text("campaign"), (float)request.Args.Number("delay"),
@@ -173,6 +177,8 @@ public sealed class ReinforceBehaviour : IBehaviour
 public sealed class HuntBehaviour : IBehaviour
 {
     public string Name => BuiltIn.Hunt;
+
+    public PartyKind Party => PartyKind.Hostile;
 
     public string Start(BehaviourContext context, BehaviourRequest request) => context.Apply(new HuntDecision(
         request.Source, request.Target.Faction, request.Target.Character, Math.Max(1, (int)request.Args.Number("squads", 1)),
@@ -199,6 +205,8 @@ public sealed class VisitBehaviour : IBehaviour
     public const int Spawning = 0, Loading = 1, Visiting = 2;
 
     public string Name => BuiltIn.Visit;
+
+    public PartyKind Party => PartyKind.Friendly;
 
     public string Start(BehaviourContext context, BehaviourRequest request)
     {

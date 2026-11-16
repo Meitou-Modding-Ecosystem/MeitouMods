@@ -26,8 +26,8 @@ Don't push to `beta` or `main` directly, rewrite their history, or merge another
   its tests, `docs/<mod-slug>.md` for its design and API.
 - Register it: a row in the README table, a folder in `MeitouMods.slnx`, a slug line in `.github/workflows/release.yml`, and an owner line
   in `.github/CODEOWNERS`.
-- Depend on another mod only through its public API and a `dependencies` range in `meitou.json` (e.g. Rivalry Core's `IRivalryApi`), never
-  its internals. A breaking API change bumps that mod's minor version (major after 1.0) and updates its dependents in the same PR.
+- Depend on another mod only through its public API and a `dependencies` range in `meitou.json` (e.g. Rivalry Core's `IRivalryApi`, see
+  [docs/depending-on-rivalry-core.md](docs/depending-on-rivalry-core.md)), never its internals. A breaking API change bumps that mod's minor version (major after 1.0) and updates its dependents in the same PR.
 
 ## Rules
 

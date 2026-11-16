@@ -175,6 +175,13 @@ public interface IRivalryRegistry
     /// A director, asked at every assessment after the rules, in the order added.
     /// </summary>
     void AddDirector(IDirector director);
+
+    /// <summary>
+    /// Lets <paramref name="source"/> (one of this mod's rules or directors, or a <see cref="PartyClaim.Source"/>) send hostile parties
+    /// <paramref name="extra"/> over the hostile cap (docs/rivalry-core.md "Party caps"). Its parties still count toward the cap for everyone
+    /// else. Shown in the debug rows with <paramref name="reason"/>.
+    /// </summary>
+    void ExceedHostileCap(string source, int extra, string reason);
 }
 
 /// <summary>
@@ -224,6 +231,11 @@ internal sealed class Registry
     public List<Entry<IDirector>> Directors { get; } = [];
 
     /// <summary>
+    /// The hostile cap overrides, in the order added.
+    /// </summary>
+    public List<Entry<CapOverride>> Overrides { get; } = [];
+
+    /// <summary>
     /// Set when the first world is built: nothing is added after.
     /// </summary>
     public bool Frozen { get; set; }
@@ -245,6 +257,7 @@ internal sealed class Registry
         Behaviours.RemoveAll(e => e.Owner == owner);
         Rules.RemoveAll(e => e.Owner == owner);
         Directors.RemoveAll(e => e.Owner == owner);
+        Overrides.RemoveAll(e => e.Owner == owner);
     }
 
     /// <summary>
@@ -279,5 +292,13 @@ internal sealed class Registry
         public void AddRule(Rule rule) => registry.Add(registry.Rules, owner, prefix, rule.Name, rule);
 
         public void AddDirector(IDirector director) => registry.Add(registry.Directors, owner, prefix, director.Name, director);
+
+        public void ExceedHostileCap(string source, int extra, string reason)
+        {
+            ArgumentOutOfRangeException.ThrowIfLessThan(extra, 1);
+            ArgumentException.ThrowIfNullOrWhiteSpace(reason);
+
+            registry.Add(registry.Overrides, owner, prefix, source, new CapOverride(owner, source, extra, reason));
+        }
     }
 }

@@ -36,6 +36,8 @@ public sealed class BurgleBehaviour : IBehaviour
 
     public string Name => BuiltIn.Burgle;
 
+    public PartyKind Party => PartyKind.Hostile;
+
     public string Start(BehaviourContext context, BehaviourRequest request)
     {
         if (context.Population is null) return "burgle: no population";

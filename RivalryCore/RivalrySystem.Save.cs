@@ -6,7 +6,7 @@ namespace Rivalry;
 public sealed partial class RivalrySystem
 {
     /// <summary>The sidecar layout's version (docs/rivalry-core.md "Save data").</summary>
-    public const int SaveVersion = 3;
+    public const int SaveVersion = 4;
 
     /// <summary>A saved grudge waiting for its character: faction by string id, character by name and record (slots differ after a load).</summary>
     readonly record struct SavedGrudge(string Faction, string Name, string Record, float Value, float HeldFloor = 0);
@@ -33,6 +33,7 @@ public sealed partial class RivalrySystem
 
         _runs.Write(_world, w);
         Rivals.Write(w);
+        _parties.Write(w, _data);
     }
 
     void WriteGrudges(BinaryWriter w)
@@ -81,6 +82,9 @@ public sealed partial class RivalrySystem
         // Version 2 adds the behaviours under way.
         if (version >= 2) _runs.Read(r);
         if (version >= 3) Rivals.Read(r);
+
+        // Version 4 adds, last, the party ledger (one-shot parties and other mods' claims).
+        if (version >= 4) _parties.Read(r, _data);
     }
 
     static List<SavedGrudge> ReadGrudges(BinaryReader r, bool withFloors)

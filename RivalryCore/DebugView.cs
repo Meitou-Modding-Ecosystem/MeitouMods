@@ -61,12 +61,15 @@ public sealed record DebugView(
     IReadOnlyList<RunView> Runs,
     IReadOnlyList<RuleView> Rules,
     IReadOnlyList<(string Key, double HoursLeft)> Cooldowns,
-    IReadOnlyList<(string Faction, double HoursAgo)> LastHitSquads)
+    IReadOnlyList<(string Faction, double HoursAgo)> LastHitSquads,
+    IReadOnlyList<PartyView> Parties,
+    int FriendlyCap,
+    IReadOnlyList<CapOverride> Overrides)
 {
     /// <summary>
     /// Before the first step of a world.
     /// </summary>
-    public static readonly DebugView Empty = new(0, 0, [], [], [], [], [], [], []);
+    public static readonly DebugView Empty = new(0, 0, [], [], [], [], [], [], [], [], 0, []);
 
     #region Building
 
@@ -74,7 +77,8 @@ public sealed record DebugView(
     /// Copies what the rows show out of the running world. Serial steps only.
     /// </summary>
     internal static DebugView Build(World world, PopulationData data, PlayerReport report, NotorietyLedger ledger, Cooldowns cooldowns,
-        IReadOnlyList<BehaviourRun> runs, RivalRoster rivals, IReadOnlyList<RuleView> rules, RivalryOptions options, SquadMemory? memory)
+        IReadOnlyList<BehaviourRun> runs, RivalRoster rivals, IReadOnlyList<RuleView> rules, RivalryOptions options, SquadMemory? memory,
+        Parties parties)
     {
         double now = world.GameHours;
         string FactionName(int f) => f >= 0 && f < data.Factions.Count ? data.Factions[f].Name : "no faction";
@@ -88,7 +92,10 @@ public sealed record DebugView(
             [.. runs.Select(r => Run(r, now, FactionName(r.Faction)))],
             rules,
             [.. cooldowns.Entries.Where(c => c.Value > now).Select(c => (c.Key, c.Value - now))],
-            [.. data.Factions.Select(f => (f.Name, rivals.HoursSinceEnded(f.Id, now))).Where(l => double.IsFinite(l.Item2))]);
+            [.. data.Factions.Select(f => (f.Name, rivals.HoursSinceEnded(f.Id, now))).Where(l => double.IsFinite(l.Item2))],
+            [.. parties.Out(runs, report, now)],
+            Rivalry.Parties.Cap(PartyKind.Friendly, options),
+            parties.Overrides);
     }
 
     /// <summary>
@@ -173,7 +180,27 @@ public sealed record DebugView(
         string runs = Runs.Count > 0
             ? string.Join("; ", Runs)
             : "no runs (a run is a squad Rivalry drives itself: a visit, thieves or a hit squad; a raid, a reinforcement and a plain grudge hunt make none)";
-        return $"{runs} | rules: {string.Join(", ", Rules.Select(r => $"{r.Name} [{r.Takes}]"))}";
+        return $"{runs} | {DescribeParties()} | rules: {string.Join(", ", Rules.Select(r => $"{r.Name} [{r.Takes}]"))}";
+    }
+
+    /// <summary>
+    /// The parties out against each cap, and the mods allowed over the hostile one.
+    /// </summary>
+    public string DescribeParties()
+    {
+        string hostile = PartiesOf(PartyKind.Hostile, Rivalry.Parties.HostileCap);
+        string friendly = PartiesOf(PartyKind.Friendly, FriendlyCap);
+        string overrides = Overrides.Count > 0 ? $"; over the hostile cap: {string.Join(", ", Overrides)}" : "";
+        return $"hostile parties {hostile}; friendly parties {friendly}{overrides}";
+    }
+
+    /// <summary>
+    /// The parties of one kind against its cap, as text.
+    /// </summary>
+    string PartiesOf(PartyKind kind, int cap)
+    {
+        var list = Parties.Where(p => p.Kind == kind).ToList();
+        return list.Count > 0 ? $"{list.Count}/{cap} ({string.Join(", ", list)})" : $"0/{cap}";
     }
 
     /// <summary>

@@ -43,10 +43,14 @@ public sealed class PursueBehaviour : IBehaviour
 
     public string Name => BuiltIn.Pursue;
 
+    public PartyKind Party => PartyKind.Hostile;
+
+    public bool Underway(BehaviourRun run) => run.Phase != Aftermath;
+
     /// <summary>
-    /// Whether the run's squad is still on its way or fighting (not yet in its aftermath): what limits a faction to one hit squad at a time.
+    /// Whether the run is a hit squad still on its way or fighting (not yet in its aftermath): what limits a faction to one hit squad at a time.
     /// </summary>
-    public static bool Underway(BehaviourRun run) => run.Behaviour == BuiltIn.Pursue && run.Phase != Aftermath;
+    public static bool HitSquadUnderway(BehaviourRun run) => run.Behaviour == BuiltIn.Pursue && run.Phase != Aftermath;
 
     public string Start(BehaviourContext context, BehaviourRequest request)
     {
