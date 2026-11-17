@@ -10,14 +10,19 @@ permissions:
   contents: write
 
 jobs:
+  release-gate:
+    permissions:
+      contents: read
+    uses: TheIvoryDisaster/GutenStructure/.github/workflows/release-gate.yml@e73b5dbfe02899b662a66cce5a35613bcece3919
   release:
+    needs: release-gate
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
           submodules: recursive
 
-      - uses: actions/setup-dotnet@v5
+      - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1
         with:
           dotnet-version: 11.0.x
 

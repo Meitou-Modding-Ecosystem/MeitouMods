@@ -25,8 +25,8 @@ After a pull that moves the engine pin: `git submodule update --init`.
 
 ## Branches and releases
 
-- Work goes in PRs to `beta`; CI (build and tests) must pass. `beta` is merged into `main` once it has been tested in play.
-- A mod is released by pushing a tag `<mod-slug>-v<version>` on `main` (e.g. `rivalry-core-v0.2.0`; slugs in
+- Work goes in PRs to `beta`; CI (build and tests) must pass. `beta` is merged into `main` once it has been tested in play. Production is promoted through a PR to `release`, with two approvals including a code owner.
+- A mod is released by pushing a tag `<mod-slug>-v<version>` on `release` (e.g. `rivalry-core-v0.2.0`; slugs in
   `.github/workflows/release.yml`). CI builds that mod and publishes `<Mod>-<version>.zip`, holding the folder to drop into `Kenshi/mods/`.
   The version must match the mod's `meitou.json`.
 - A mod folder also needs a `<Mod>.mod` file. A mod without data ships none; make an empty one in FCS until the mod has one in the repo.
