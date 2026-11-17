@@ -38,7 +38,7 @@ jobs:
           esac
 
   release:
-    needs: mod
+    needs: [mod, release-gate]
     permissions:
       contents: write
     uses: ./.github/workflows/package-meitou-mod.yml
