@@ -47,6 +47,43 @@ them). Dustlife reads the others through their public APIs and never sends hunte
 A place held by a faction the simulation does not run (a boss hideout) is locked: never a target. On the base game plus several large world
 mods this makes 420 places (38 bases, 119 resource points, 263 territories, 145 locked) and 64 factions.
 
+## The place graph (nodes and edges)
+
+Planned (2026-11-16), not built yet. Today a place is only a point: bands walk to a target in a straight line, and a base scores targets by
+priority over straight-line distance squared, so a town across a mountain range counts as near. The fix is to make the map a graph:
+**every place is a node, and the roads between places are its edges.**
+
+- **Where the edges come from:** the game's own road network. MeitouClient builds it as a graph already (`RoadNetwork`,
+  `src/Meitou.Simulation/Towns/RoadNetwork.cs`, public and read-only once built): each ROAD is an edge between two junctions with its
+  `length`. Trips of 10,000 units (about 1 km) or less go straight, and a road can be joined up to 20,000 units from either end of a trip
+  (both marked Verified there). Off-screen squads sent with `SendPlatoon` walk the same roads, so the graph and what the player sees agree.
+- **Building it, once at load:** link each place to the road junctions it can join; run shortest paths between junctions; an edge joins
+  two places when a road route connects them without passing through a third place first, weighted by its road length. Places closer than the
+  straight-trip limit get a direct edge. About 420 nodes and a few hundred edges, so all shortest paths are cheap to keep and only need
+  refreshing when something changes: ownership changes nothing in the graph, only in what each edge means.
+- **Off-road edges:** a straight edge between places with no road, at a travel penalty, used only by roles that cut across country
+  (raiders, fauna, a besieger's flankers). Invaders, caravans and garrison moves keep to roads.
+
+What the edges give the war:
+
+| Use | Rule |
+| --- | --- |
+| Targets | A base scores targets by **road distance** (sum of edge lengths), not straight-line distance. |
+| Fronts | The front is the set of edges whose two ends are held by factions at war. The Bast Front is then computed, not drawn: the contested edges around Okran's Shield and Stack. |
+| Supply | Caravans travel along edges between a faction's places. An edge held by an enemy band, or a caravan raided on it, is **cut**: stock stops reaching the place at the far end (the economy's "cut road"). |
+| Sieges | A place is **cut off** when every edge to a friendly place is cut. A cut-off place gets no supply and no relief bands. |
+| Chokepoints | A place with few edges that joins two parts of a faction's graph is a natural strongpoint: targets can weigh it higher. |
+| News | "The road from X to Y is cut" and "Z is cut off" are events for The Wasteland Remembers to tell. |
+
+How it is checked (each rule logs when it fires and is counted, as every Dustlife rule):
+- **Graph sanity, offline:** the graph is connected for each region the game links by road; no edge is shorter than the straight line
+  between its places; road distance is never below straight distance. Falsified by any place with no edge that the game reaches by road.
+- **Behaviour, balance runner:** with road distance, invasions follow roads and no band targets a place across impassable ground; a cut
+  edge lowers the far place's stock within the next supply step. Falsified if the front and capture counts do not change between straight
+  and road distance (then the graph adds nothing), or if cut places never starve.
+- **Unknown:** whether every place's nearest junction is within the 20,000-unit join range (towns off the road net need the off-road edge),
+  and whether the C++ balance runner's map export can read the same roads from the level data. Both checked first.
+
 ## War rules (today)
 
 - **Seeding:** 2 garrison bands per base, 1 per resource point.
@@ -144,5 +181,6 @@ One PR each, into `beta`:
 1. This document, a README row and a CODEOWNERS line; the mod skeleton (`meitou.json`, empty system).
 2. The core world (places, factions, bands, time, combat) and Warfare's garrisons and resources, on synthetic-world tests.
 3. The balance runner and its fixtures from the C++ reference.
-4. Bands as real platoons through the world hooks.
-5. The economy rules, one at a time, each with its falsifier.
+4. The place graph: edges from the road network, targets by road distance, fronts and cut roads (with its offline checks).
+5. Bands as real platoons through the world hooks.
+6. The economy rules, one at a time, each with its falsifier.
