@@ -7,9 +7,11 @@ Code mods for [MeitouClient](https://github.com/Meitou-Modding-Ecosystem/MeitouC
 | Rivalry Core | `rivalry.core` | [docs/rivalry-core.md](docs/rivalry-core.md) |
 | The Ashen Hand | `ashen.hand` | [docs/ashen-hand.md](docs/ashen-hand.md) |
 | Husbandry | `husbandry` | [docs/husbandry.md](docs/husbandry.md) |
+| SquadArena (test only) | `squad.arena` | [docs/squad-rating.md](docs/squad-rating.md) |
 
 Building a mod on Rivalry Core: [docs/depending-on-rivalry-core.md](docs/depending-on-rivalry-core.md) (agent skill:
-`.claude/skills/rivalry-core-dependent`). Planned work: [docs/roadmap.md](docs/roadmap.md). Factions and where their squads come from: [docs/factions.md](docs/factions.md).
+`.claude/skills/rivalry-core-dependent`). Rating squads in Dust-bandit equivalents (SquadArena mod and SquadRating tool): [docs/squad-rating.md](docs/squad-rating.md) (agent skill:
+`.claude/skills/squad-rating`). Planned work: [docs/roadmap.md](docs/roadmap.md). Factions and where their squads come from: [docs/factions.md](docs/factions.md).
 
 Works alongside: [The Wasteland Remembers](docs/wasteland-remembers.md) (a separate mod on the Steam Workshop; town heat, bounty hunters, rivals,
 outlaws and town talk, with a public API: [docs/wasteland-remembers-api.md](docs/wasteland-remembers-api.md)).
