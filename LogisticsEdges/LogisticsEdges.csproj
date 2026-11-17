@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Vanilla edge seeding for Logistics Core (#59, docs/vanilla-edges.md): which places the game's own roads join, and what each trip costs.
+    The companion of vanilla node seeding (docs/vanilla-nodes.md). A library, not a mod: Logistics Core takes it over when its repository
+    exists. Built against the game's assemblies.
+  -->
+
+  <PropertyGroup>
+    <AssemblyName>LogisticsEdges</AssemblyName>
+    <RootNamespace>Logistics.Edges</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../engine/src/Meitou.Core/Meitou.Core.csproj" Private="false" />
+    <ProjectReference Include="../engine/src/Meitou.Data/Meitou.Data.csproj" Private="false" />
+    <ProjectReference Include="../engine/src/Meitou.Simulation/Meitou.Simulation.csproj" Private="false" />
+  </ItemGroup>
+
+</Project>
