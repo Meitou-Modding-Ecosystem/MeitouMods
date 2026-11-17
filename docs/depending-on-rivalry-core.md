@@ -99,6 +99,8 @@ A mod that works without Rivalry Core declares it with `"optional": true` and re
 (engine [modding-dependencies.md](https://github.com/Meitou-Modding-Ecosystem/MeitouClient/blob/master/docs/modding-dependencies.md)).
 It still compiles against Rivalry Core through one of the sources above, so the compiler catches API changes, and the launcher still loads
 Rivalry Core first when it is enabled.
+Compiling proves only the typed calls: test the mod both with Rivalry Core loaded and without it, since the absent path runs code the
+compiler never ties to Rivalry Core.
 
 ## 2. Declare it in `meitou.json`
 
