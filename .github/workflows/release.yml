@@ -14,7 +14,9 @@ jobs:
     permissions:
       contents: read
     uses: TheIvoryDisaster/GutenStructure/.github/workflows/release-gate.yml@b61f1f282b7366f06915df81c5012330cdaf9fa3
+
   mod:
+    needs: release-gate
     runs-on: ubuntu-latest
     outputs:
       slug: ${{ steps.mod.outputs.slug }}
