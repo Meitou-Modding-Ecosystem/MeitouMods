@@ -41,17 +41,10 @@ jobs:
         run: dotnet test -c Release
 
       - name: Package
-        shell: pwsh
         env:
           FOLDER: ${{ steps.mod.outputs.folder }}
           VERSION: ${{ steps.mod.outputs.version }}
-        run: |
-          $out = "package/$env:FOLDER"
-          dotnet publish "$env:FOLDER" -c Release -o $out
-          # Only the mod's own files: the game supplies its assemblies.
-          Get-ChildItem $out -File | Where-Object { $_.Name -notmatch "^$env:FOLDER\.(dll|pdb|mod)$|^meitou\.json$" } | Remove-Item
-          Get-ChildItem $out -Directory | Remove-Item -Recurse
-          Compress-Archive -Path $out -DestinationPath "$env:FOLDER-$env:VERSION.zip"
+        run: tools/package-mod.sh "$FOLDER" "$FOLDER-$VERSION.zip"
 
       - name: Publish
         env:

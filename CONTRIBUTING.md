@@ -24,6 +24,7 @@ Don't push to `beta` or `main` directly, rewrite their history, or merge another
 
 - `<Mod>/` with `<Mod>.csproj` and `meitou.json` (id `<author-or-mod>.<name>`, SemVer `version`, `apiVersion` 2), `<Mod>.Tests/` for
   its tests, `docs/<mod-slug>.md` for its design and API.
+- The version lives only in `meitou.json`: `Directory.Build.props` gives the assembly that version, so never set `<Version>` in a `.csproj`.
 - Register it: a row in the README table, a folder in `MeitouMods.slnx`, a slug line in `.github/workflows/release.yml`, and an owner line
   in `.github/CODEOWNERS`.
 - Depend on another mod only through its public API and a `dependencies` range in `meitou.json` (e.g. Rivalry Core's `IRivalryApi`, see

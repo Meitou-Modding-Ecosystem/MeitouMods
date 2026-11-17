@@ -1,0 +1,94 @@
+# Publishes Rivalry Core from beta as GitHub prereleases, for mods in other repos to test against before a production release
+# (docs/depending-on-rivalry-core.md "Getting Rivalry Core"):
+# - rivalry-core-<version>-beta.<commit>: one per beta commit that changes the framework; never moved.
+# - rivalry-core-beta: always the newest of those, with the fixed asset name RivalryCore-beta.zip.
+# Neither tag matches release.yml's <slug>-v<version>, so production releases stay gated on the release branch.
+name: Rivalry Core beta
+
+on:
+  push:
+    branches: [beta]
+    paths:
+      - RivalryCore/**
+      - engine
+      - Directory.Build.props
+      - tools/**
+      - .github/workflows/rivalry-core-beta.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: rivalry-core-beta
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: github.ref == 'refs/heads/beta'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          submodules: recursive
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 11.0.x
+
+      - name: Version
+        id: v
+        run: |
+          version=$(jq -r .version RivalryCore/meitou.json)
+          short=$(git rev-parse --short=7 HEAD)
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "label=$version-beta.$short" >> "$GITHUB_OUTPUT"
+          echo "engine=$(git -C engine rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Test
+        run: dotnet test RivalryCore.Tests -c Release
+
+      - name: Package
+        env:
+          LABEL: ${{ steps.v.outputs.label }}
+        run: |
+          tools/package-mod.sh RivalryCore "RivalryCore-$LABEL.zip"
+          cp "RivalryCore-$LABEL.zip" RivalryCore-beta.zip
+
+      - name: Notes
+        env:
+          VERSION: ${{ steps.v.outputs.version }}
+          ENGINE: ${{ steps.v.outputs.engine }}
+        run: |
+          cat > notes.md <<NOTES
+          Rivalry Core $VERSION from \`beta\` (prerelease, not a production release).
+
+          - MeitouMods commit: $GITHUB_SHA
+          - Engine commit it was built against: Meitou-Modding-Ecosystem/MeitouClient@$ENGINE
+          - The manifest says \`$VERSION\`, so dependency ranges such as \`>=$VERSION\` accept it. Pin this release's tag, not the version:
+            later beta builds can carry the same version.
+
+          Drop the \`RivalryCore/\` folder into \`Kenshi/mods/\` and enable it above the mods that depend on it.
+          NOTES
+
+      - name: Publish snapshot
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LABEL: ${{ steps.v.outputs.label }}
+        run: |
+          tag="rivalry-core-$LABEL"
+          if gh release view "$tag" > /dev/null 2>&1; then
+            echo "$tag already published"
+          else
+            gh release create "$tag" "RivalryCore-$LABEL.zip" --target "$GITHUB_SHA" --prerelease --latest=false \
+              --title "Rivalry Core $LABEL" --notes-file notes.md
+          fi
+
+      - name: Move rolling beta
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LABEL: ${{ steps.v.outputs.label }}
+        run: |
+          gh release delete rivalry-core-beta --cleanup-tag --yes || true
+          gh release create rivalry-core-beta RivalryCore-beta.zip "RivalryCore-$LABEL.zip" --target "$GITHUB_SHA" --prerelease \
+            --latest=false --title "Rivalry Core beta ($LABEL)" --notes-file notes.md

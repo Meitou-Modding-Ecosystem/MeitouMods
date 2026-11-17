@@ -24,7 +24,8 @@ copies or replaces it. Read `docs/depending-on-rivalry-core.md` first, and `docs
 1. **Manifest**: `apiVersion` 2 and `"dependencies": [{ "id": "rivalry.core", "version": ">=0.6.0 <0.7.0" }]` (match the current
    `RivalryCore/meitou.json` minor). Tell the user Rivalry Core must load above the mod in `mods.cfg`.
 2. **Project**: in this repo add `<ProjectReference Include="../RivalryCore/RivalryCore.csproj" Private="false" />` next to the engine
-   references (copy `AshenHand/AshenHand.csproj`). Elsewhere reference a release's `RivalryCore.dll` with `<Private>false</Private>`.
+   references (copy `AshenHand/AshenHand.csproj`). Elsewhere pin this repo as a submodule
+   or reference a zip's `RivalryCore.dll`, with `Private="false"` ([docs/depending-on-rivalry-core.md](../../../docs/depending-on-rivalry-core.md) section 1).
 3. **Entry**: in `Initialize`, `var rivalry = c.Dependency<IRivalryApi>(RivalryMod.Id)`, then `var mine = rivalry.For(c.Id)`. Every name
    starts with `c.Id + "."`. Register nothing outside `Initialize`.
 4. **Pick the shape** of the new feature:
