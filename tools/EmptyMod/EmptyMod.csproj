@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <!-- Writes a data mod file with no records, for a code mod without data (tools/Package-Mod.ps1). Argument: the .mod file to write. -->
+  <!-- Writes a data mod file with no records, for a code mod without data (local installs; CI writes the same bytes). Argument: the .mod file to write. -->
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>

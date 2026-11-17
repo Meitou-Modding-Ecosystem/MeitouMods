@@ -534,5 +534,3 @@ MeitouMods.user.props
 # Native libraries built for older macOS releases
 macos-runtime/
 
-# Mod zips built by tools/package-mod.sh
-/package/
