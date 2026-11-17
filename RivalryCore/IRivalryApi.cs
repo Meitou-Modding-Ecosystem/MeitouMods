@@ -33,13 +33,19 @@ public interface IDirector
     void Assess(Assessment assessment, Decisions decisions);
 }
 
-/// <summary>Rivalry Core's state in one world.</summary>
+/// <summary>Rivalry Core's state in one world. Serial steps of that world only, except the copies (<see cref="History"/>, <see cref="Runs"/>,
+/// <see cref="Parties"/>).</summary>
 public interface IRivalryState
 {
     /// <summary>The latest inspection; <see cref="PlayerReport.Empty"/> before the first.</summary>
     PlayerReport Report { get; }
 
     NotorietyLedger Notoriety { get; }
+
+    /// <summary>
+    /// The named leaders of hit squads and their records, the leaders handed to the law, and each faction's last hit squad.
+    /// </summary>
+    RivalRoster Rivals { get; }
 
     /// <summary>The latest decisions, newest last, as log lines (at most 64).</summary>
     IReadOnlyList<string> History { get; }
@@ -48,4 +54,32 @@ public interface IRivalryState
     /// The behaviours under way, as lines.
     /// </summary>
     IReadOnlyList<string> Runs { get; }
+
+    /// <summary>
+    /// The parties out now, hostile and friendly: Rivalry Core's runs and one-shot decisions, and other mods' claims (docs/rivalry-core.md
+    /// "Party caps"). A copy, refreshed every slow step.
+    /// </summary>
+    IReadOnlyList<PartyView> Parties { get; }
+
+    /// <summary>
+    /// How many parties of the kind are out now.
+    /// </summary>
+    int PartiesOut(PartyKind kind);
+
+    /// <summary>
+    /// How many parties of the kind may be out at once (overrides aside): 1 hostile, the player's setting friendly.
+    /// </summary>
+    int PartyCap(PartyKind kind);
+
+    /// <summary>
+    /// Counts a party the calling mod runs itself under the caps, or renews its claim of the same source and key: true when it holds. False:
+    /// the cap is full (send nothing now and ask again later). The claim lapses <see cref="PartyClaim.Hours"/> after it was made or renewed, so
+    /// renew it while the party is out and release it when it ends.
+    /// </summary>
+    bool ClaimParty(PartyClaim claim);
+
+    /// <summary>
+    /// Ends a claim made with <see cref="ClaimParty"/>; false when there was none.
+    /// </summary>
+    bool ReleaseParty(string source, string key);
 }

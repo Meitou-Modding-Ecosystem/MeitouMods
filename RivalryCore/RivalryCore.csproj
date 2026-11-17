@@ -2,13 +2,12 @@
 
   <!--
     Rivalry Core (docs/rivalry-core.md): a code-mod framework that inspects the player's setup and lets directors decide what the
-    world's factions do about it. Built against the game's assemblies, never copied: the game supplies them (docs/modding.md "Writing a mod").
+    world's factions do about it. Built against the game's assemblies: the game supplies them (docs/modding.md "Writing a mod").
   -->
 
   <PropertyGroup>
     <AssemblyName>RivalryCore</AssemblyName>
     <RootNamespace>Rivalry</RootNamespace>
-    <Version>0.2.0</Version>
   </PropertyGroup>
 
   <ItemGroup>

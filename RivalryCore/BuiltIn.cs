@@ -25,7 +25,13 @@ public static class BuiltIn
     /// <summary>
     /// Behaviours.
     /// </summary>
-    public const string Raid = "rivalry.raid", Reinforce = "rivalry.reinforce", Hunt = "rivalry.hunt", Visit = "rivalry.visit";
+    public const string Raid = "rivalry.raid", Reinforce = "rivalry.reinforce", Hunt = "rivalry.hunt", Visit = "rivalry.visit",
+        Burgle = "rivalry.burgle", Pursue = "rivalry.pursue";
+
+    /// <summary>
+    /// The rule that sends any faction's hit squad after a character it holds a grudge against.
+    /// </summary>
+    public const string HitSquadRule = "rivalry.hit-squad";
 
     /// <summary>
     /// Registers the built-ins.
@@ -45,9 +51,12 @@ public static class BuiltIn
         r.AddBehaviour(new ReinforceBehaviour());
         r.AddBehaviour(new HuntBehaviour());
         r.AddBehaviour(new VisitBehaviour());
+        r.AddBehaviour(new BurgleBehaviour());
+        r.AddBehaviour(new PursueBehaviour());
 
         r.AddRule(ReinforceRule());
         r.AddRule(OpportunistRule());
+        r.AddRule(HitSquad());
         r.AddDirector(new GrudgeDirector());
     }
 
@@ -70,6 +79,22 @@ public static class BuiltIn
             .DefaultIfEmpty(-1)
             .First(),
         Notice = (a, t) => $"{a.Faction(t.Faction)?.Name} answers the call to {a.Report.TownOf(t.Town)?.Name}",
+    };
+
+    /// <summary>
+    /// A faction whose grudge against a standing character has reached the hunt threshold sends one of its own squads from its base after them
+    /// (<see cref="HitSquads"/>): one squad per faction at a time, once per character per cooldown.
+    /// </summary>
+    static Rule HitSquad() => new()
+    {
+        Name = HitSquadRule,
+        Target = CharacterTarget,
+        Behaviour = Pursue,
+        Enabled = o => o.Hunters && o.HitSquads,
+        CooldownHours = o => o.HuntCooldownHours,
+        Faction = (a, t) => HitSquads.FactionFor(a, t.Character),
+        Args = (a, t) => new BehaviourArgs().Set("template", HitSquads.TemplateFor(a.Data, t.Faction) ?? "").Set("hours", a.Options.HuntHours),
+        Notice = (a, t) => $"{a.Faction(t.Faction)?.Name} has sent a hit squad for {t.Key}",
     };
 
     /// <summary>
@@ -124,6 +149,8 @@ public sealed class RaidBehaviour : IBehaviour
 {
     public string Name => BuiltIn.Raid;
 
+    public PartyKind Party => PartyKind.Hostile;
+
     public string Start(BehaviourContext context, BehaviourRequest request) => context.Apply(
         new RaidDecision(request.Source, request.Target.Faction, request.Target.Town, request.Args.Text("campaign"), (float)request.Args.Number("delay")));
 }
@@ -135,6 +162,8 @@ public sealed class RaidBehaviour : IBehaviour
 public sealed class ReinforceBehaviour : IBehaviour
 {
     public string Name => BuiltIn.Reinforce;
+
+    public PartyKind Party => PartyKind.Friendly;
 
     public string Start(BehaviourContext context, BehaviourRequest request) => context.Apply(new ReinforceDecision(
         request.Source, request.Target.Faction, request.Target.Town, request.Args.Text("campaign"), (float)request.Args.Number("delay"),
@@ -148,6 +177,8 @@ public sealed class ReinforceBehaviour : IBehaviour
 public sealed class HuntBehaviour : IBehaviour
 {
     public string Name => BuiltIn.Hunt;
+
+    public PartyKind Party => PartyKind.Hostile;
 
     public string Start(BehaviourContext context, BehaviourRequest request) => context.Apply(new HuntDecision(
         request.Source, request.Target.Faction, request.Target.Character, Math.Max(1, (int)request.Args.Number("squads", 1)),
@@ -174,6 +205,8 @@ public sealed class VisitBehaviour : IBehaviour
     public const int Spawning = 0, Loading = 1, Visiting = 2;
 
     public string Name => BuiltIn.Visit;
+
+    public PartyKind Party => PartyKind.Friendly;
 
     public string Start(BehaviourContext context, BehaviourRequest request)
     {
@@ -233,7 +266,7 @@ public sealed class VisitBehaviour : IBehaviour
     /// <summary>
     /// The town site nearest to a point (ties by index): a spawned platoon's home; -1 without sites.
     /// </summary>
-    static int NearestSite(PopulationData data, Vector2 at)
+    internal static int NearestSite(PopulationData data, Vector2 at)
     {
         int best = -1;
         float bestDistance = float.MaxValue;

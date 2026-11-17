@@ -46,6 +46,11 @@ public sealed record TownReport(
     public int Beds { get; init; }
 
     /// <summary>
+    /// What its finished buildings and furniture cost in construction materials (not stealable, so raids do not count it).
+    /// </summary>
+    public long BuildingValue { get; init; }
+
+    /// <summary>
     /// The probes' numbers, by probe name (<see cref="IRivalryRegistry.AddTownProbe"/>).
     /// </summary>
     public IReadOnlyDictionary<string, double> Values { get; init; } = PlayerReport.NoValues;
@@ -74,8 +79,25 @@ public sealed record PlayerReport(
     /// </summary>
     internal static readonly IReadOnlyDictionary<string, double> NoValues = new Dictionary<string, double>();
 
-    /// <summary>Money, everything the characters carry and wear, and every town's stored value.</summary>
-    public long Wealth => Money + Characters.Sum(c => c.GearValue + c.CarriedValue) + Towns.Sum(t => t.StoredValue);
+    /// <summary>
+    /// What the player's characters wear and carry, wherever they are.
+    /// </summary>
+    public long Carried => Characters.Sum(c => c.GearValue + c.CarriedValue);
+
+    /// <summary>
+    /// What the player-owned containers in the player's towns hold.
+    /// </summary>
+    public long Stored => Towns.Sum(t => t.StoredValue);
+
+    /// <summary>
+    /// What the player's finished buildings and furniture cost in materials.
+    /// </summary>
+    public long Built => Towns.Sum(t => t.BuildingValue);
+
+    /// <summary>
+    /// Money, <see cref="Carried"/>, <see cref="Stored"/> and <see cref="Built"/>.
+    /// </summary>
+    public long Wealth => Money + Carried + Stored + Built;
 
     /// <summary>The standing character with the highest strength; null when none stands.</summary>
     public CharacterReport? Strongest => Characters.Where(c => !c.Down).MaxBy(c => c.Strength);

@@ -16,6 +16,16 @@ public interface IBehaviour
     string Name { get; }
 
     /// <summary>
+    /// What a start of it sends at the player, counted under the party caps (docs/rivalry-core.md "Party caps"); none: not capped.
+    /// </summary>
+    PartyKind Party => PartyKind.None;
+
+    /// <summary>
+    /// Whether a run of it still counts as a party out (a hit squad in its aftermath no longer does); every run by default.
+    /// </summary>
+    bool Underway(BehaviourRun run) => true;
+
+    /// <summary>
     /// Starts it for a target; returns a log line saying what happened.
     /// </summary>
     string Start(BehaviourContext context, BehaviourRequest request);
@@ -113,9 +123,17 @@ public sealed class BehaviourContext
     /// </summary>
     readonly BehaviourRuns _runs;
 
+    /// <summary>
+    /// The inspector, for its prices.
+    /// </summary>
+    readonly Inspector _inspector;
+
     internal BehaviourContext(World world, PopulationData data, PlayerReport report, RivalryOptions options, RngPurpose purpose, Actions actions,
-        BehaviourRuns runs, PopulationSystem? population)
+        BehaviourRuns runs, PopulationSystem? population, Inspector inspector, NotorietyLedger notoriety, RivalRoster rivals)
     {
+        Notoriety = notoriety;
+        Rivals = rivals;
+        _inspector = inspector;
         World = world;
         Data = data;
         Report = report;
@@ -152,9 +170,29 @@ public sealed class BehaviourContext
     public PopulationSystem? Population { get; }
 
     /// <summary>
+    /// The grudges factions hold against characters.
+    /// </summary>
+    public NotorietyLedger Notoriety { get; }
+
+    /// <summary>
+    /// The named leaders of hit squads, the leaders handed to the law, and each faction's last hit squad.
+    /// </summary>
+    public RivalRoster Rivals { get; }
+
+    /// <summary>
     /// A uniform number in [0, 1), the same for the same world seed, tick and key.
     /// </summary>
     public float Roll(string key) => Rng.Float(Rng.Hash(World.Seed, (ulong)World.Tick, _purpose, Rng.StableHash(key)));
+
+    /// <summary>
+    /// What a stack is worth at the game's prices (as the report counts wealth).
+    /// </summary>
+    public long ValueOf(Meitou.Simulation.Items.ItemInstance item) => _inspector.ValueOf(item);
+
+    /// <summary>
+    /// The first system of a kind in the world; null when it has none.
+    /// </summary>
+    public T? System<T>() where T : class => World.Systems.OfType<T>().FirstOrDefault();
 
     /// <summary>
     /// Carries out one of the framework's decisions now and returns its log line.

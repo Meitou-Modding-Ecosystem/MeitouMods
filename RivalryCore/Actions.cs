@@ -11,27 +11,47 @@ namespace Rivalry;
 /// (<see cref="PopulationSystem.RequestCampaign"/>), AI contracts (<see cref="StartContract"/>, deferred to the next tick), squad memory tags and relations.
 /// Each returns a log line saying what happened.
 /// </summary>
-internal sealed class Actions(PopulationData data, PopulationSystem? population, SquadMemory? memory, NotorietyLedger ledger, Catalogue catalogue)
+internal sealed class Actions(PopulationData data, PopulationSystem? population, SquadMemory? memory, NotorietyLedger ledger, Catalogue catalogue,
+    Parties parties)
 {
     /// <summary>Hostiles one reinforcing squad marks at most.</summary>
     public const int MaxMarked = 16;
 
-    public string Apply(World world, Decision decision, RivalryOptions options, PlayerReport report) => decision switch
+    /// <summary>
+    /// Carries out a decision; one that sent a party (squads marked, a campaign queued, squads sent to help) is noted under the party caps.
+    /// </summary>
+    public string Apply(World world, Decision decision, RivalryOptions options, PlayerReport report)
+    {
+        var (line, sent) = Carry(world, decision, options, report);
+        if (sent) parties.Record(decision, world.GameHours, NameOf(world, decision));
+        return line;
+    }
+
+    /// <summary>
+    /// The name of the character a hunt aims at, for the party's line; null for any other decision.
+    /// </summary>
+    static string? NameOf(World world, Decision decision) =>
+        decision is HuntDecision h && world.Characters.TryResolveNext(h.Target, out int slot) ? world.Characters.Cold(slot)?.Name : null;
+
+    /// <summary>
+    /// The decision's log line, and whether it sent a party.
+    /// </summary>
+    (string Line, bool Sent) Carry(World world, Decision decision, RivalryOptions options, PlayerReport report) => decision switch
     {
         HuntDecision d => Hunt(world, d, options),
         RaidDecision d => Raid(world, d),
         ReinforceDecision d => Reinforce(world, d, options, report),
-        DirectDecision d => Direct(world, d.Squad, d.Package, d.Hours, d.Target),
-        RelationDecision d => Relation(world, d),
-        GrudgeDecision d => Grudge(d),
-        NoticeDecision d => Notice(world, d.Message),
-        CustomDecision d => Custom(world, d),
-        _ => $"unknown decision {decision.GetType().Name}",
+        DirectDecision d => (Direct(world, d.Squad, d.Package, d.Hours, d.Target), false),
+        RelationDecision d => (Relation(world, d), false),
+        GrudgeDecision d => (Grudge(d), false),
+        NoticeDecision d => (Notice(world, d.Message), false),
+        CustomDecision d => (Custom(world, d), false),
+        _ => ($"unknown decision {decision.GetType().Name}", false),
     };
 
-    string Hunt(World world, HuntDecision d, RivalryOptions options)
+    (string Line, bool Sent) Hunt(World world, HuntDecision d, RivalryOptions options)
     {
-        if (!world.Characters.TryResolveNext(d.Target, out int slot)) return $"hunt by {FactionName(d.Faction)}: target gone";
+        if (!world.Characters.TryResolveNext(d.Target, out int slot)) return ($"hunt by {FactionName(d.Faction)}: target gone", false);
         var at = world.Characters.Next[slot].Position;
         var squads = Candidates(world, d.Faction, at, options.HuntRadius, options.UseTownSquads).Take(d.Squads).ToList();
         string? package = d.Package ?? options.HuntPackage;
@@ -40,23 +60,29 @@ internal sealed class Actions(PopulationData data, PopulationSystem? population,
             memory?.Flag(world, squad.Id, d.Target, MemoryTag.TempEnemy);
             if (package is not null) Direct(world, squad.Id, package, d.Hours, d.Target);
         }
-        return $"hunt: {FactionName(d.Faction)} sends {squads.Count} squad(s) after {world.Characters.Cold(slot)?.Name}";
+        string name = world.Characters.Cold(slot)?.Name ?? "";
+        string line = squads.Count > 0
+            ? $"hunt: {squads.Count} {FactionName(d.Faction)} squad(s) already near {name} now hold them as an enemy"
+            : $"hunt: no {FactionName(d.Faction)} squad within {options.HuntRadius:0} of {name}";
+        return (line, squads.Count > 0);
     }
 
-    string Raid(World world, RaidDecision d)
+    (string Line, bool Sent) Raid(World world, RaidDecision d)
     {
         string? id = d.CampaignId ?? catalogue.CampaignFor(d.Faction, CampaignKey.AssaultTown);
-        if (id is null || population is null) return $"raid: {FactionName(d.Faction)} has no assault campaign";
+        if (id is null || population is null) return ($"raid: {FactionName(d.Faction)} has no assault campaign", false);
+
         bool queued = population.RequestCampaign(world, d.Faction, id, CampaignTown.OfPlayer(d.Town), d.DelayHours);
-        return $"raid: {FactionName(d.Faction)} {(queued ? "queued" : "refused")} {id} against town {d.Town}";
+        return ($"raid: {FactionName(d.Faction)} {(queued ? "queued" : "refused")} {id} against town {d.Town}", queued);
     }
 
-    string Reinforce(World world, ReinforceDecision d, RivalryOptions options, PlayerReport report)
+    (string Line, bool Sent) Reinforce(World world, ReinforceDecision d, RivalryOptions options, PlayerReport report)
     {
         string? id = d.CampaignId ?? catalogue.CampaignFor(d.Faction, CampaignKey.DefendTown);
         bool queued = id is not null && population?.RequestCampaign(world, d.Faction, id, CampaignTown.OfPlayer(d.Town), d.DelayHours) == true;
         int sent = d.Nearby && report.TownOf(d.Town) is { } town ? SendNearby(world, d.Faction, town, options) : 0;
-        return $"reinforce: {FactionName(d.Faction)} to town {d.Town}: campaign {(queued ? id : "none")}, {sent} squad(s) nearby";
+        string line = $"reinforce: {FactionName(d.Faction)} to town {d.Town}: campaign {(queued ? id : "none")}, {sent} squad(s) nearby";
+        return (line, queued || sent > 0);
     }
 
     int SendNearby(World world, int faction, TownReport town, RivalryOptions options)
@@ -107,7 +133,7 @@ internal sealed class Actions(PopulationData data, PopulationSystem? population,
     /// Squads of the faction that may be sent, nearest first within the radius (ground plane; id order breaks ties): not the player's, not dead, with a
     /// living leader, in no campaign, and not a town's own squad unless allowed.
     /// </summary>
-    static IEnumerable<Squad> Candidates(World world, int faction, Vector3 at, float radius, bool townSquads)
+    internal static IEnumerable<Squad> Candidates(World world, int faction, Vector3 at, float radius, bool townSquads)
     {
         var inCampaign = world.Platoons.All.Where(p => p.Campaign is not null && p.SquadId >= 0).Select(p => p.SquadId).ToHashSet();
         return world.Squads.All

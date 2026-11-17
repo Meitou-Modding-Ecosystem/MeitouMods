@@ -1,3 +1,4 @@
+using System.Globalization;
 using Meitou.Modding;
 using Meitou.Simulation;
 using Meitou.Simulation.Combat;
@@ -14,9 +15,9 @@ public sealed record AssessNowCommand : SimCommand;
 public sealed record FireRuleCommand(string Rule, string? Key) : SimCommand;
 
 /// <summary>
-/// Starts a behaviour for a player town with a faction (its name or string id) acting (the debug rows).
+/// Starts a behaviour for a player town (its name, number or key; null: the first) with a faction (its name or string id) acting (the debug rows).
 /// </summary>
-public sealed record StartBehaviourCommand(string Behaviour, int Town, string Faction, BehaviourArgs Args) : SimCommand;
+public sealed record StartBehaviourCommand(string Behaviour, string? Town, string Faction, BehaviourArgs Args) : SimCommand;
 
 /// <summary>Adds to the grudge a faction (its name or string id) holds against characters (the debug row; dependents use <see cref="Decisions.Grudge"/>).</summary>
 public sealed record GrudgeCommand(IReadOnlyList<CharacterId> Characters, string Faction, float Amount) : SimCommand;
@@ -29,6 +30,11 @@ public sealed partial class RivalrySystem : ICombatHitObserver, IStateHashed, IM
 {
     public const int HistoryLength = 64;
 
+    /// <summary>
+    /// Ticks between copies of the state for the debug rows (one game second at 30 ticks a second); a debug command or an assessment copies at once.
+    /// </summary>
+    public const int ViewEveryTicks = 30;
+
     readonly PopulationData _data;
     readonly IReadOnlyList<IDirector> _directors;
     readonly RivalryOptions _settings;
@@ -39,7 +45,10 @@ public sealed partial class RivalrySystem : ICombatHitObserver, IStateHashed, IM
     readonly Actions _actions;
     readonly RuleEngine _rules;
     readonly BehaviourRuns _runs;
+    readonly Parties _parties;
     readonly PopulationSystem? _population;
+    readonly HunterBarks _barks;
+    readonly SquadMemory? _memory;
     readonly Cooldowns _cooldowns = new();
     readonly HashSet<string> _faulted = new(StringComparer.Ordinal);
     readonly List<string> _history = [];
@@ -49,6 +58,7 @@ public sealed partial class RivalrySystem : ICombatHitObserver, IStateHashed, IM
     double _nextAssess = double.NaN;
     double _lastAssess = double.NaN;
     bool _assessNow;
+    bool _viewDue = true;
 
     internal RivalrySystem(SystemBuildContext context, Registry registry, RivalryOptions settings, RngPurpose purpose, Action<string> log)
     {
@@ -61,9 +71,13 @@ public sealed partial class RivalrySystem : ICombatHitObserver, IStateHashed, IM
         _inspector = new Inspector(_data, [.. registry.TownProbes.Select(e => (e.Name, e.Value))], [.. registry.CharacterProbes.Select(e => (e.Name, e.Value))]);
         _population = context.Find<PopulationSystem>();
         _catalogue = new Catalogue(_data, _population);
-        _actions = new Actions(_data, _population, context.Find<DialogueSystem>()?.Memory, Notoriety, _catalogue);
+        _memory = context.Find<DialogueSystem>()?.Memory;
+        var behaviours = registry.Behaviours.ToDictionary(e => e.Name, e => e.Value, StringComparer.Ordinal);
+        _parties = new Parties(behaviours, [.. registry.Overrides.Select(e => e.Value)]);
+        _actions = new Actions(_data, _population, _memory, Notoriety, _catalogue, _parties);
+        _barks = new HunterBarks(context.Find<CombatSystem>());
         _rules = new RuleEngine(registry, log);
-        _runs = new BehaviourRuns(_data, registry.Behaviours.ToDictionary(e => e.Name, e => e.Value, StringComparer.Ordinal), log);
+        _runs = new BehaviourRuns(_data, behaviours, log);
     }
 
     /// <summary>
@@ -82,6 +96,11 @@ public sealed partial class RivalrySystem : ICombatHitObserver, IStateHashed, IM
     public PlayerReport Report { get; private set; } = PlayerReport.Empty;
     public NotorietyLedger Notoriety { get; } = new();
 
+    /// <summary>
+    /// The named leaders of hit squads, the leaders handed to the law, and each faction's last hit squad.
+    /// </summary>
+    public RivalRoster Rivals { get; } = new();
+
     /// <summary>A copy, safe to read from the host's thread.</summary>
     public IReadOnlyList<string> History { get; private set; } = [];
 
@@ -89,6 +108,16 @@ public sealed partial class RivalrySystem : ICombatHitObserver, IStateHashed, IM
     /// The behaviours under way, as lines; a copy, safe to read from the host's thread.
     /// </summary>
     public IReadOnlyList<string> Runs { get; private set; } = [];
+
+    /// <summary>
+    /// The parties out, hostile and friendly (docs/rivalry-core.md "Party caps"); a copy, safe to read from the host's thread.
+    /// </summary>
+    public IReadOnlyList<PartyView> Parties { get; private set; } = [];
+
+    /// <summary>
+    /// What the debug rows read: a copy, safe to read from the host's thread.
+    /// </summary>
+    public DebugView Debug { get; private set; } = DebugView.Empty;
 
     /// <summary>
     /// The rules' names, in evaluation order.
@@ -103,6 +132,9 @@ public sealed partial class RivalrySystem : ICombatHitObserver, IStateHashed, IM
             if (command is AssessNowCommand) _assessNow = true;
             else if (command is GrudgeCommand g) AddGrudge(g);
             else if (command is FireRuleCommand or StartBehaviourCommand) _asked.Add(command);
+            else continue;
+
+            _viewDue = true;
         }
     }
 
@@ -112,12 +144,26 @@ public sealed partial class RivalrySystem : ICombatHitObserver, IStateHashed, IM
         ResolveSaved(world);
         CheckKills(world);
         StepRuns(world);
+        _barks.Step(world, _runs.All, Rivals, _options);
         RunAsked(world);
         if (double.IsNaN(_nextAssess)) _nextAssess = world.GameHours;
-        if (!_assessNow && world.GameHours < _nextAssess) return;
+        if (_assessNow || world.GameHours >= _nextAssess)
+        {
+            _assessNow = false;
+            _viewDue = true;
+            Assess(world);
+        }
 
-        _assessNow = false;
-        Assess(world);
+        if (_viewDue || world.Tick % ViewEveryTicks == 0) PublishView(world);
+    }
+
+    /// <summary>
+    /// Copies the state for the debug rows.
+    /// </summary>
+    void PublishView(World world)
+    {
+        _viewDue = false;
+        Debug = DebugView.Build(world, _data, Report, Notoriety, _cooldowns, _runs.All, Rivals, _rules.Views, _options, _memory, _parties);
     }
 
     void AddGrudge(GrudgeCommand g)
@@ -127,7 +173,7 @@ public sealed partial class RivalrySystem : ICombatHitObserver, IStateHashed, IM
         foreach (var who in g.Characters) Notoriety.Add(faction, who, g.Amount);
     }
 
-    int FactionByName(string text)
+    internal int FactionByName(string text)
     {
         if (_data.FactionIndex(text) is >= 0 and var byId) return byId;
         for (int f = 0; f < _data.Factions.Count; f++)
@@ -136,12 +182,42 @@ public sealed partial class RivalrySystem : ICombatHitObserver, IStateHashed, IM
     }
 
     /// <summary>
+    /// Where a faction (its name or string id) sends squads from, as a line for the debug row: how the bases were found and the nearest few to the
+    /// player's first character.
+    /// </summary>
+    public string DescribeBases(string factionName)
+    {
+        int faction = FactionByName(factionName);
+        if (faction < 0) return $"no faction {factionName}";
+
+        var bases = FactionBases.Of(_data, faction, FactionBases.NamesFor(_data, faction, _settings, []));
+        string squad = HitSquads.TemplateFor(_data, faction) is { } template
+            ? $"hit squad: {_data.Db.Find(template)?.Name} ({template})"
+            : "no squad of its own to send: no hit squads unless a mod gives it one";
+        if (bases.Count == 0) return $"{_data.Factions[faction].Name}: {squad}; no base found; hit squads take {_settings.HuntTravelFallbackHours:0.#} h";
+
+        var at = Report.Characters.FirstOrDefault() is { } c ? new System.Numerics.Vector2(c.Position.X, c.Position.Z) : default;
+        var nearest = bases.OrderBy(b => System.Numerics.Vector2.Distance(b.Position, at)).Select(b => b.Label).Distinct().Take(5);
+        return $"{_data.Factions[faction].Name}: {squad}; {bases.Count} {bases[0].Source} bases; nearest: {string.Join(", ", nearest)}";
+    }
+
+    /// <summary>
     /// Steps the behaviours under way and publishes their lines.
     /// </summary>
     void StepRuns(World world)
     {
         if (_runs.All.Count > 0) _runs.Step(Context(world));
+        Rivals.Idle(_runs.All.Where(r => r.Args.Text("leaderName") is not null).Select(LeaderOf));
         PublishRuns();
+    }
+
+    /// <summary>
+    /// The faction and leader a run names, for <see cref="RivalRoster.Idle"/>.
+    /// </summary>
+    (string Faction, string Name) LeaderOf(BehaviourRun run)
+    {
+        string faction = run.Faction >= 0 && run.Faction < _data.Factions.Count ? _data.Factions[run.Faction].Id : "";
+        return (faction, run.Args.Text("leaderName")!);
     }
 
     /// <summary>
@@ -149,6 +225,7 @@ public sealed partial class RivalrySystem : ICombatHitObserver, IStateHashed, IM
     /// </summary>
     void PublishRuns()
     {
+        if (_world is { } world) Parties = [.. _parties.Out(_runs.All, Report, world.GameHours)];
         if (_runs.All.Count == 0 && Runs.Count == 0) return;
 
         Runs = [.. _runs.All.Select(r => $"run {r.Id} {r.Behaviour} town {r.Town} platoon {r.Platoon} phase {r.Phase} until {r.Until:0.#} h")];
@@ -165,21 +242,56 @@ public sealed partial class RivalrySystem : ICombatHitObserver, IStateHashed, IM
         var decided = new List<Decision>();
         foreach (var command in _asked)
         {
-            if (command is FireRuleCommand fire) Remember($"debug: {_rules.Fire(NewAssessment(world), fire.Rule, fire.Key, decided, _cooldowns)}");
-            else if (command is StartBehaviourCommand start) decided.Add(AsDecision(start));
+            if (command is FireRuleCommand fire) Fire(world, fire, decided);
+            else if (command is StartBehaviourCommand start) Start(start, decided);
         }
 
         _asked.Clear();
-        foreach (var decision in decided) Carry(world, decision);
+        foreach (var decision in decided) Carry(world, decision, capped: false);
     }
 
     /// <summary>
-    /// A debug start as a decision.
+    /// A debug row's rule fired, whatever its conditions, cooldown and the party caps say.
     /// </summary>
-    StartDecision AsDecision(StartBehaviourCommand start)
+    void Fire(World world, FireRuleCommand fire, List<Decision> decided)
     {
-        var target = new RuleTarget($"town{start.Town}") { Town = start.Town, Faction = FactionByName(start.Faction) };
-        return new StartDecision("debug", start.Behaviour, target, start.Args);
+        string line = _rules.Fire(NewAssessment(world, decided), fire.Rule, TownKey(fire.Key), decided, _cooldowns);
+        Remember($"debug: {line} (party caps skipped)");
+    }
+
+    /// <summary>
+    /// A debug start as a decision, or a log line when the player has no such town.
+    /// </summary>
+    void Start(StartBehaviourCommand start, List<Decision> decided)
+    {
+        if (TownOf(start.Town) is not { } town)
+        {
+            Remember($"debug: {start.Behaviour}: no player town {start.Town}");
+            return;
+        }
+
+        var target = new RuleTarget($"town{town}") { Town = town, Faction = FactionByName(start.Faction) };
+        decided.Add(new StartDecision("debug", start.Behaviour, target, start.Args));
+    }
+
+    /// <summary>
+    /// A debug row's target key with a player town's name or number turned into its key (<c>town{number}</c>); any other text as typed.
+    /// </summary>
+    string? TownKey(string? key) => key is not null && TownOf(key) is { } town ? $"town{town}" : key;
+
+    /// <summary>
+    /// The number of the player town a debug row names: by key, number or name (case ignored); empty or null: the first; null when none matches.
+    /// </summary>
+    int? TownOf(string? text)
+    {
+        var towns = Report.Towns;
+        if (string.IsNullOrWhiteSpace(text)) return towns.Count > 0 ? towns[0].Number : null;
+
+        string name = text.Trim();
+        string number = name.StartsWith("town", StringComparison.OrdinalIgnoreCase) ? name[4..] : name;
+        var match = towns.FirstOrDefault(t => t.Number.ToString(CultureInfo.InvariantCulture) == number)
+            ?? towns.FirstOrDefault(t => string.Equals(t.Name, name, StringComparison.OrdinalIgnoreCase));
+        return match?.Number;
     }
 
     void Assess(World world)
@@ -187,23 +299,29 @@ public sealed partial class RivalrySystem : ICombatHitObserver, IStateHashed, IM
         double hours = double.IsNaN(_lastAssess) ? 0 : world.GameHours - _lastAssess;
         _lastAssess = world.GameHours;
         _nextAssess = world.GameHours + Math.Max(1, _options.AssessEveryHours);
-        Notoriety.Decay(world.Characters, hours, _options.GrudgeHalfLifeDays * 24);
+        Notoriety.Cool(world.Characters, hours, _options.GrudgeCoolPerHour);
         _cooldowns.Expire(world.GameHours);
         Report = _inspector.Inspect(world);
+        _parties.Expire(Report, world.GameHours);
         if (Report.PlayerFaction < 0) return;
 
         var decided = Decide(world);
-        foreach (var decision in decided) Carry(world, decision);
+        foreach (var decision in decided) Carry(world, decision, capped: true);
     }
 
-    Assessment NewAssessment(World world) => new(world, _data, Report, Notoriety, _options, _purpose, _catalogue);
+    /// <summary>
+    /// What the rules and directors see; <paramref name="pending"/> holds the decisions recorded so far, which count as parties out.
+    /// </summary>
+    Assessment NewAssessment(World world, IReadOnlyList<Decision> pending) =>
+        new(world, _data, Report, Notoriety, _options, _purpose, _catalogue, Rivals, _runs.All, _parties, pending);
 
-    BehaviourContext Context(World world) => new(world, _data, Report, _options, _purpose, _actions, _runs, _population);
+    BehaviourContext Context(World world) =>
+        new(world, _data, Report, _options, _purpose, _actions, _runs, _population, _inspector, Notoriety, Rivals);
 
     List<Decision> Decide(World world)
     {
-        var assessment = NewAssessment(world);
         var decided = new List<Decision>();
+        var assessment = NewAssessment(world, decided);
         _rules.Evaluate(assessment, decided, _cooldowns);
         foreach (var director in _directors)
         {
@@ -221,8 +339,18 @@ public sealed partial class RivalrySystem : ICombatHitObserver, IStateHashed, IM
         return decided;
     }
 
-    void Carry(World world, Decision decision)
+    /// <summary>
+    /// Carries out a decision and logs it; <paramref name="capped"/>: one that would send a party over its kind's cap is held instead (the debug
+    /// rows' asks are not capped).
+    /// </summary>
+    void Carry(World world, Decision decision, bool capped)
     {
+        if (capped && HeldLine(world, decision) is { } held)
+        {
+            Remember($"{decision.Director}: {held}");
+            return;
+        }
+
         string line;
         try
         {
@@ -238,12 +366,56 @@ public sealed partial class RivalrySystem : ICombatHitObserver, IStateHashed, IM
         PublishRuns();
     }
 
+    /// <summary>
+    /// Why the decision is held by its party cap; null when it may go.
+    /// </summary>
+    string? HeldLine(World world, Decision decision)
+    {
+        var kind = _parties.KindOf(decision);
+        if (kind == PartyKind.None) return null;
+
+        int count = _parties.Count(kind, _runs.All, Report, world.GameHours);
+        if (_parties.Admits(kind, decision.Director, count, _options)) return null;
+
+        string what = decision is StartDecision s ? s.Behaviour : KindName(decision);
+        return $"held: {what} would be {kind.ToString().ToLowerInvariant()} party {count + 1} of {Rivalry.Parties.Cap(kind, _options)}";
+    }
+
+    /// <summary>
+    /// A decision's type as a word (<c>HuntDecision</c>: hunt).
+    /// </summary>
+    static string KindName(Decision decision) => decision.GetType().Name.Replace("Decision", "", StringComparison.Ordinal).ToLowerInvariant();
+
     void Remember(string line)
     {
         _log(line);
         _history.Add(line);
         if (_history.Count > HistoryLength) _history.RemoveAt(0);
         History = [.. _history];
+    }
+
+    /// <summary>
+    /// How many parties of the kind are out now. Serial steps only.
+    /// </summary>
+    public int PartiesOut(PartyKind kind) => _world is { } world ? _parties.Count(kind, _runs.All, Report, world.GameHours) : 0;
+
+    public int PartyCap(PartyKind kind) => Rivalry.Parties.Cap(kind, _options);
+
+    public bool ClaimParty(PartyClaim claim)
+    {
+        ArgumentNullException.ThrowIfNull(claim);
+        if (_world is not { } world || claim.Kind == PartyKind.None || claim.Hours <= 0) return false;
+
+        bool held = _parties.Claim(claim, PartiesOut(claim.Kind), _options, world.GameHours);
+        PublishRuns();
+        return held;
+    }
+
+    public bool ReleaseParty(string source, string key)
+    {
+        bool released = _parties.Release(source, key);
+        PublishRuns();
+        return released;
     }
 
     public void Hash(ref StateHasher h)
@@ -254,5 +426,7 @@ public sealed partial class RivalrySystem : ICombatHitObserver, IStateHashed, IM
         h.Add(_faulted.Count + _rules.Faulted);
         HashVictims(ref h);
         _runs.Hash(ref h);
+        Rivals.Hash(ref h);
+        _parties.Hash(ref h);
     }
 }
