@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Writes a data mod file with no records, for a code mod without data (local installs; CI writes the same bytes). Argument: the .mod file to write. -->
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>EmptyMod</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../engine/src/Meitou.Data/Meitou.Data.csproj" />
+  </ItemGroup>
+
+</Project>

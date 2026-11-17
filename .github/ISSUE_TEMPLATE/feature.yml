@@ -1,0 +1,22 @@
+name: Feature or new mod
+description: Propose a change to a mod, a new mod, or an engine hook a mod needs.
+labels: [enhancement]
+body:
+  - type: input
+    id: mod
+    attributes:
+      label: Mod
+      description: Existing mod, or the name of a new one.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: What it should do in play
+    validations:
+      required: true
+  - type: textarea
+    id: needs
+    attributes:
+      label: What it needs
+      description: Other mods' APIs it would use, and any engine hook it needs that doesn't exist yet.
