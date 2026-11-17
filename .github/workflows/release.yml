@@ -10,6 +10,10 @@ permissions:
   contents: read
 
 jobs:
+  release-gate:
+    permissions:
+      contents: read
+    uses: TheIvoryDisaster/GutenStructure/.github/workflows/release-gate.yml@e73b5dbfe02899b662a66cce5a35613bcece3919
   mod:
     runs-on: ubuntu-latest
     outputs:
@@ -32,7 +36,7 @@ jobs:
           esac
 
   release:
-    needs: mod
+    needs: [mod, release-gate]
     permissions:
       contents: write
     uses: ./.github/workflows/package-meitou-mod.yml
