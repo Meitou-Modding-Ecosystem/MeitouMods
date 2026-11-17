@@ -13,7 +13,7 @@ jobs:
   release-gate:
     permissions:
       contents: read
-    uses: TheIvoryDisaster/GutenStructure/.github/workflows/release-gate.yml@e73b5dbfe02899b662a66cce5a35613bcece3919
+    uses: TheIvoryDisaster/GutenStructure/.github/workflows/release-gate.yml@b61f1f282b7366f06915df81c5012330cdaf9fa3
   mod:
     runs-on: ubuntu-latest
     outputs:
@@ -39,7 +39,7 @@ jobs:
     needs: [mod, release-gate]
     permissions:
       contents: write
-    uses: TheIvoryDisaster/GutenStructure/.github/workflows/package-meitou-mod.yml@0ef1d783148f161894193d1aa322650b88b75bd5
+    uses: TheIvoryDisaster/GutenStructure/.github/workflows/package-meitou-mod.yml@b61f1f282b7366f06915df81c5012330cdaf9fa3
     with:
       mod-folder: ${{ needs.mod.outputs.folder }}
       slug: ${{ needs.mod.outputs.slug }}
