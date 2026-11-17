@@ -8,7 +8,6 @@
   <PropertyGroup>
     <AssemblyName>AshenHand</AssemblyName>
     <RootNamespace>AshenHand</RootNamespace>
-    <Version>0.1.0</Version>
   </PropertyGroup>
 
   <ItemGroup>

@@ -1,0 +1,31 @@
+# Publishes Rivalry Core from beta as GitHub prereleases for mods in other repos to test against (docs/depending-on-rivalry-core.md):
+# rivalry-core-<version>-beta.<commit> per framework change (never moved) and rolling rivalry-core-beta (RivalryCore-beta.zip).
+# The packaging is the reusable package-meitou-mod.yml, meant for GutenStructure; once it is there, point uses: at its reviewed SHA.
+name: Rivalry Core beta
+
+on:
+  push:
+    branches: [beta]
+    paths:
+      - RivalryCore/**
+      - engine
+      - Directory.Build.props
+      - .github/workflows/rivalry-core-beta.yml
+      - .github/workflows/package-meitou-mod.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  rivalry-core:
+    if: github.ref == 'refs/heads/beta'
+    permissions:
+      contents: write
+    uses: ./.github/workflows/package-meitou-mod.yml
+    with:
+      mod-folder: RivalryCore
+      slug: rivalry-core
+      channel: beta
+      test-project: RivalryCore.Tests
+      empty-data-mod: true
