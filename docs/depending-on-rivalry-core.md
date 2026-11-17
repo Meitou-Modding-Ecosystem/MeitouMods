@@ -73,7 +73,7 @@ git commit -am "Move Rivalry Core to <new commit>"
 
 ### Zip
 
-Each release holds the zip, its `.sha256` file, and notes naming the MeitouMods commit, the engine commit and the zip's SHA-256. The zip holds
+Versioned releases hold the zip, its `.sha256` file, and notes naming the MeitouMods commit, the engine commit and the zip's SHA-256. The zip holds
 the `RivalryCore/` folder (`RivalryCore.dll`, `RivalryCore.pdb`, `meitou.json` and an empty `RivalryCore.mod`).
 
 | Zip | Download |
@@ -175,3 +175,10 @@ state.ReleaseParty(claim.Source, claim.Key);
 - **Going over the cap**: only on purpose, in `Initialize`: `mine.ExceedHostileCap($"{c.Id}.siege", 1, "the siege brings its own scouts")`.
   The source may send one more than the cap; its parties still count for everyone else. `Rivalry: parties` (F10) lists every override.
 - **Seeing it**: `IRivalryState.Parties`, `PartiesOut(kind)`, `PartyCap(kind)`; F10 `Rivalry: parties` and `Rivalry: log` (`held: ...`).
+
+
+### Packaging publication checks
+
+The hardened packager rechecks production tags against the current protected release head immediately before publishing, in addition to the caller's central release-gate prerequisite. Beta snapshots require beta history, and an older build/rerun does not move the rolling beta pointer backward. Existing versioned releases are verified against source/channel/digest; if rebuilt ZIP bytes differ (including timestamps), the rerun fails clearly instead of reporting a new hash for the old artifact. Use the existing canonical snapshot/hash, and consume outputs only from a successful workflow. Both rolling ZIP names receive sidecars after this update.
+
+The write-token job executes only the pinned central publisher helper, never caller code. These guards are covered by GutenStructure publication tests; this does not prove a consumer's game integration.
