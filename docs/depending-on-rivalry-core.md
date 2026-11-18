@@ -9,6 +9,7 @@ walks through the same steps: [.claude/skills/rivalry-core-dependent](../.claude
 
 | Source | Use it for | Where |
 | --- | --- | --- |
+| Framework lock (recommended) | a mod repo of the org: builds and tests against a release, moved automatically on new ones | `meitou.lock.json` naming a release or beta zip; see below |
 | Commit-pinned source | building against current `beta` before any release | this repo as a git submodule of yours (`deps/MeitouMods`), pinned to a commit |
 | Beta zip | testers' installs; a DLL to compile against without a submodule | prereleases `rivalry-core-<version>-beta.<commit>` (one per beta commit that changes the framework, never moved) and `rivalry-core-beta` (always the newest) |
 | Release zip | published mods | releases `rivalry-core-v<version>`, tagged on `release` |
@@ -23,10 +24,14 @@ In every case:
 - The version lives only in `RivalryCore/meitou.json`; the DLL takes it at build time. A beta zip carries the manifest's version, so your
   `dependencies` range accepts it, but later beta builds can carry the same version: pin the tag, not the version.
 
-### In this repo
+### Framework lock
 
-`<ProjectReference Include="../RivalryCore/RivalryCore.csproj" Private="false" />`, beside the engine references (see
-`AshenHand/AshenHand.csproj`).
+A repo made from [MeitouModTemplate](https://github.com/Meitou-Modding-Ecosystem/MeitouModTemplate) names Rivalry Core's zip in
+`meitou.lock.json` (tag, asset, SHA-256 and engine commit from the release notes); the build downloads, checks and references it, Play
+deploys it, and a scheduled workflow moves the lock to new releases. Setup: GutenStructure
+[framework lock](https://github.com/TheIvoryDisaster/GutenStructure/blob/beta/docs/framework-lock.md) and
+[framework update](https://github.com/TheIvoryDisaster/GutenStructure/blob/beta/docs/framework-update.md). Working example:
+[AshenHand](https://github.com/Meitou-Modding-Ecosystem/AshenHand).
 
 ### Commit-pinned source
 
