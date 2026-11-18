@@ -4,8 +4,8 @@ Rivalry Core (`rivalry.core`), a framework for [MeitouClient](https://github.com
 [docs/rivalry-core.md](docs/rivalry-core.md). GPL-3.0-or-later.
 
 Mods that lived here now have their own repos: [AshenHand](https://github.com/Meitou-Modding-Ecosystem/AshenHand),
-[Husbandry](https://github.com/Meitou-Modding-Ecosystem/Husbandry) and [SquadArena](https://github.com/Meitou-Modding-Ecosystem/SquadArena)
-(squad rating in Dust-bandit equivalents). New mods start from [MeitouModTemplate](https://github.com/Meitou-Modding-Ecosystem/MeitouModTemplate).
+[Husbandry](https://github.com/Meitou-Modding-Ecosystem/Husbandry), [SquadArena](https://github.com/Meitou-Modding-Ecosystem/SquadArena)
+(squad rating in Dust-bandit equivalents) and [LogisticsCore](https://github.com/Meitou-Modding-Ecosystem/LogisticsCore) (vanilla node seeding). New mods start from [MeitouModTemplate](https://github.com/Meitou-Modding-Ecosystem/MeitouModTemplate).
 
 Building a mod on Rivalry Core: [docs/depending-on-rivalry-core.md](docs/depending-on-rivalry-core.md) (agent skill:
 `.claude/skills/rivalry-core-dependent`). Planned work: [docs/roadmap.md](docs/roadmap.md). Factions and where their squads come from: [docs/factions.md](docs/factions.md).
