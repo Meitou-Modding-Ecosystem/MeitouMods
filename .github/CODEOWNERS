@@ -11,17 +11,17 @@
 /AshenHand.Tests/         @TheIvoryDisaster
 /docs/ashen-hand.md       @TheIvoryDisaster
 
-/docs/dustlife.md          @PZA-Mods-bot
-/docs/bast-front.md        @PZA-Mods-bot
+/docs/dustlife.md          @PZA-Mods-bot @TheIvoryDisaster
+/docs/bast-front.md        @PZA-Mods-bot @TheIvoryDisaster
 
 /Husbandry/               @TheIvoryDisaster
 /Husbandry.Data/          @TheIvoryDisaster
 /docs/husbandry.md        @TheIvoryDisaster
 
-/docs/wasteland-remembers.md      @aaallleeeccc
-/docs/wasteland-remembers-api.md  @aaallleeeccc
-/docs/news-and-rumours.md         @aaallleeeccc
-/docs/outlaws-and-tolls.md        @aaallleeeccc
+/docs/wasteland-remembers.md      @aaallleeeccc @TheIvoryDisaster
+/docs/wasteland-remembers-api.md  @aaallleeeccc @TheIvoryDisaster
+/docs/news-and-rumours.md         @aaallleeeccc @TheIvoryDisaster
+/docs/outlaws-and-tolls.md        @aaallleeeccc @TheIvoryDisaster
 
 /LogisticsEdges/                  @PZA-Mods-bot @TheIvoryDisaster
 /LogisticsEdges.Tests/            @PZA-Mods-bot @TheIvoryDisaster
