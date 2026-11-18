@@ -10,7 +10,7 @@ walks through the same steps: [.claude/skills/rivalry-core-dependent](../.claude
 | Source | Use it for | Where |
 | --- | --- | --- |
 | Framework lock (recommended) | a mod repo of the org: builds and tests against a release, moved automatically on new ones | `meitou.lock.json` naming a release or beta zip; see below |
-| Commit-pinned source | building against current `beta` before any release | this repo as a git submodule of yours (`deps/MeitouMods`), pinned to a commit |
+| Commit-pinned source | building against current `beta` before any release | this repo as a git submodule of yours (`deps/RivalryCore`), pinned to a commit |
 | Beta zip | testers' installs; a DLL to compile against without a submodule | prereleases `rivalry-core-<version>-beta.<commit>` (one per beta commit that changes the framework, never moved) and `rivalry-core-beta` (always the newest) |
 | Release zip | published mods | releases `rivalry-core-v<version>`, tagged on `release` |
 
@@ -19,7 +19,7 @@ In every case:
 - Reference Rivalry Core with `Private="false"`, and never list `RivalryCore.dll` in your own `assemblies`: the loader refuses the mod. A
   stray copy in your folder is ignored; the loaded `rivalry.core` serves the types, so every dependent shares one framework, one grudge
   ledger and one set of party caps.
-- Build against the same engine commit Rivalry Core was built against: the `engine/` pin of the MeitouMods commit, which every zip's
+- Build against the same engine commit Rivalry Core was built against: the `engine/` pin of the RivalryCore commit, which every zip's
   release notes name.
 - The version lives only in `RivalryCore/meitou.json`; the DLL takes it at build time. A beta zip carries the manifest's version, so your
   `dependencies` range accepts it, but later beta builds can carry the same version: pin the tag, not the version.
@@ -38,10 +38,10 @@ deploys it, and a scheduled workflow moves the lock to new releases. Setup: Gute
 **In your mod repo's root:**
 
 ```sh
-git submodule add https://github.com/Meitou-Modding-Ecosystem/MeitouMods.git deps/MeitouMods
-git -C deps/MeitouMods checkout --detach <commit on beta>
+git submodule add https://github.com/Meitou-Modding-Ecosystem/RivalryCore.git deps/RivalryCore
+git -C deps/RivalryCore checkout --detach <commit on beta>
 git submodule update --init --recursive
-git add .gitmodules deps/MeitouMods
+git add .gitmodules deps/RivalryCore
 git commit -m "Pin Rivalry Core to <commit on beta>"
 ```
 
@@ -50,42 +50,42 @@ against one engine:
 
 ```xml
 <ItemGroup>
-  <ProjectReference Include="../deps/MeitouMods/engine/src/Meitou.Core/Meitou.Core.csproj" Private="false" />
-  <ProjectReference Include="../deps/MeitouMods/engine/src/Meitou.Data/Meitou.Data.csproj" Private="false" />
-  <ProjectReference Include="../deps/MeitouMods/engine/src/Meitou.Simulation/Meitou.Simulation.csproj" Private="false" />
-  <ProjectReference Include="../deps/MeitouMods/engine/src/Meitou.Game/Meitou.Game.csproj" Private="false" />
-  <ProjectReference Include="../deps/MeitouMods/RivalryCore/RivalryCore.csproj" Private="false" />
+  <ProjectReference Include="../deps/RivalryCore/engine/src/Meitou.Core/Meitou.Core.csproj" Private="false" />
+  <ProjectReference Include="../deps/RivalryCore/engine/src/Meitou.Data/Meitou.Data.csproj" Private="false" />
+  <ProjectReference Include="../deps/RivalryCore/engine/src/Meitou.Simulation/Meitou.Simulation.csproj" Private="false" />
+  <ProjectReference Include="../deps/RivalryCore/engine/src/Meitou.Game/Meitou.Game.csproj" Private="false" />
+  <ProjectReference Include="../deps/RivalryCore/RivalryCore/RivalryCore.csproj" Private="false" />
 </ItemGroup>
 ```
 
-Import `deps/MeitouMods/engine/Directory.Build.props` from your own `Directory.Build.props`, so your mod builds with the engine's settings.
+Import `deps/RivalryCore/engine/Directory.Build.props` from your own `Directory.Build.props`, so your mod builds with the engine's settings.
 
 To install the pinned Rivalry Core for play, download the beta zip of that commit if it has one; otherwise, **in your mod repo's root**:
 
 ```sh
-dotnet publish deps/MeitouMods/RivalryCore -c Release -o "<Kenshi>/mods/RivalryCore"
-dotnet run --project deps/MeitouMods/tools/EmptyMod -c Release -- "<Kenshi>/mods/RivalryCore/RivalryCore.mod"
+dotnet publish deps/RivalryCore/RivalryCore -c Release -o "<Kenshi>/mods/RivalryCore"
+dotnet run --project deps/RivalryCore/tools/EmptyMod -c Release -- "<Kenshi>/mods/RivalryCore/RivalryCore.mod"
 ```
 
 To move the pin, **in your mod repo's root**:
 
 ```sh
-git -C deps/MeitouMods fetch origin beta
-git -C deps/MeitouMods checkout --detach <new commit>
+git -C deps/RivalryCore fetch origin beta
+git -C deps/RivalryCore checkout --detach <new commit>
 git submodule update --init --recursive
 git commit -am "Move Rivalry Core to <new commit>"
 ```
 
 ### Zip
 
-Versioned releases hold the zip, its `.sha256` file, and notes naming the MeitouMods commit, the engine commit and the zip's SHA-256. The zip holds
+Versioned releases hold the zip, its `.sha256` file, and notes naming the RivalryCore commit, the engine commit and the zip's SHA-256. The zip holds
 the `RivalryCore/` folder (`RivalryCore.dll`, `RivalryCore.pdb`, `meitou.json` and an empty `RivalryCore.mod`).
 
 | Zip | Download |
 | --- | --- |
-| Newest beta | `https://github.com/Meitou-Modding-Ecosystem/MeitouMods/releases/download/rivalry-core-beta/RivalryCore-beta.zip` |
-| One beta build | `https://github.com/Meitou-Modding-Ecosystem/MeitouMods/releases/download/rivalry-core-<version>-beta.<commit>/RivalryCore-<version>-beta.<commit>.zip` |
-| Release | `https://github.com/Meitou-Modding-Ecosystem/MeitouMods/releases/download/rivalry-core-v<version>/RivalryCore-<version>.zip` |
+| Newest beta | `https://github.com/Meitou-Modding-Ecosystem/RivalryCore/releases/download/rivalry-core-beta/RivalryCore-beta.zip` |
+| One beta build | `https://github.com/Meitou-Modding-Ecosystem/RivalryCore/releases/download/rivalry-core-<version>-beta.<commit>/RivalryCore-<version>-beta.<commit>.zip` |
+| Release | `https://github.com/Meitou-Modding-Ecosystem/RivalryCore/releases/download/rivalry-core-v<version>/RivalryCore-<version>.zip` |
 
 - To play: extract the zip into `Kenshi/mods/`, so the files sit in `Kenshi/mods/RivalryCore/`, and enable Rivalry Core above your mod.
 - To compile against it: copy `RivalryCore.dll` from the zip to `lib/RivalryCore.dll` in your mod repo, and in your mod's `.csproj`
@@ -94,7 +94,7 @@ the `RivalryCore/` folder (`RivalryCore.dll`, `RivalryCore.pdb`, `meitou.json` a
 - To fetch it in CI: pin the tag and the SHA-256 from the release notes in your workflow, never `rivalry-core-beta`, and check the bytes:
 
 ```sh
-gh release download "$RIVALRY_TAG" --repo Meitou-Modding-Ecosystem/MeitouMods --pattern 'RivalryCore-*.zip' --dir deps
+gh release download "$RIVALRY_TAG" --repo Meitou-Modding-Ecosystem/RivalryCore --pattern 'RivalryCore-*.zip' --dir deps
 echo "$RIVALRY_SHA256  $(ls deps/RivalryCore-*.zip)" | sha256sum -c -
 ```
 
