@@ -1,26 +1,4 @@
-# Owners must approve PRs touching their paths. Later lines win. Add a line per mod when it is created (folders, tests, data, docs).
+# Owners must approve PRs touching their paths. Later lines win.
+# Any one member of the team can give the code-owner approval.
 
-*                         @TheIvoryDisaster
-
-/RivalryCore/             @TheIvoryDisaster
-/RivalryCore.Tests/       @TheIvoryDisaster
-/docs/rivalry-core.md     @TheIvoryDisaster
-
-/docs/dustlife.md          @PZA-Mods-bot @TheIvoryDisaster
-/docs/bast-front.md        @PZA-Mods-bot @TheIvoryDisaster
-
-/docs/wasteland-remembers.md      @aaallleeeccc @TheIvoryDisaster
-/docs/wasteland-remembers-api.md  @aaallleeeccc @TheIvoryDisaster
-/docs/news-and-rumours.md         @aaallleeeccc @TheIvoryDisaster
-/docs/outlaws-and-tolls.md        @aaallleeeccc @TheIvoryDisaster
-/LogisticsSeed/                   @aaallleeeccc @TheIvoryDisaster
-/LogisticsSeed.Tests/             @aaallleeeccc @TheIvoryDisaster
-/docs/vanilla-nodes.md            @aaallleeeccc @TheIvoryDisaster
-
-# Shared build, CI and the engine pin: maintainers.
-/.github/                 @TheIvoryDisaster
-/engine                   @TheIvoryDisaster
-/.gitmodules              @TheIvoryDisaster
-/Directory.Build.props    @TheIvoryDisaster
-/RivalryCore.slnx         @TheIvoryDisaster
-/Play/                    @TheIvoryDisaster
+*                         @Meitou-Modding-Ecosystem/super-maintainers
