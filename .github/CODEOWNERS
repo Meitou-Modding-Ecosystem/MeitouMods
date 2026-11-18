@@ -22,10 +22,13 @@
 /docs/wasteland-remembers-api.md  @aaallleeeccc @TheIvoryDisaster
 /docs/news-and-rumours.md         @aaallleeeccc @TheIvoryDisaster
 /docs/outlaws-and-tolls.md        @aaallleeeccc @TheIvoryDisaster
+/LogisticsSeed/                   @aaallleeeccc @TheIvoryDisaster
+/LogisticsSeed.Tests/             @aaallleeeccc @TheIvoryDisaster
+/docs/vanilla-nodes.md            @aaallleeeccc @TheIvoryDisaster
 
 /LogisticsEdges/                  @PZA-Mods-bot @TheIvoryDisaster
 /LogisticsEdges.Tests/            @PZA-Mods-bot @TheIvoryDisaster
-/docs/vanilla-edges.md            @PZA-Mods-bot
+/docs/vanilla-edges.md            @PZA-Mods-bot @TheIvoryDisaster
 
 # Shared build, CI and the engine pin: maintainers.
 /.github/                 @TheIvoryDisaster
