@@ -1,5 +1,5 @@
 # Releases one mod: a tag <slug>-v<version> (rivalry-core-v0.2.0) builds that mod, checks the version against its meitou.json, and publishes
-# <Mod>-<version>.zip (with its SHA-256) holding the folder to drop into Kenshi/mods/. Packaging: package-meitou-mod.yml.
+# <Mod>-<version>.zip (with its SHA-256) holding the folder to drop into Kenshi/mods/. Packaging: GutenStructure package-meitou-mod.yml (pinned).
 name: Release
 
 on:
@@ -13,7 +13,7 @@ jobs:
   release-gate:
     permissions:
       contents: read
-    uses: TheIvoryDisaster/GutenStructure/.github/workflows/release-gate.yml@e73b5dbfe02899b662a66cce5a35613bcece3919
+    uses: TheIvoryDisaster/GutenStructure/.github/workflows/release-gate.yml@b61f1f282b7366f06915df81c5012330cdaf9fa3
 
   mod:
     needs: release-gate
@@ -41,7 +41,7 @@ jobs:
     needs: [mod, release-gate]
     permissions:
       contents: write
-    uses: ./.github/workflows/package-meitou-mod.yml
+    uses: TheIvoryDisaster/GutenStructure/.github/workflows/package-meitou-mod.yml@b61f1f282b7366f06915df81c5012330cdaf9fa3
     with:
       mod-folder: ${{ needs.mod.outputs.folder }}
       slug: ${{ needs.mod.outputs.slug }}
