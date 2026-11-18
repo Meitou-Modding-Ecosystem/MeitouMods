@@ -22,6 +22,9 @@
 /docs/wasteland-remembers-api.md  @aaallleeeccc @TheIvoryDisaster
 /docs/news-and-rumours.md         @aaallleeeccc @TheIvoryDisaster
 /docs/outlaws-and-tolls.md        @aaallleeeccc @TheIvoryDisaster
+/LogisticsSeed/                   @aaallleeeccc @TheIvoryDisaster
+/LogisticsSeed.Tests/             @aaallleeeccc @TheIvoryDisaster
+/docs/vanilla-nodes.md            @aaallleeeccc @TheIvoryDisaster
 
 # Shared build, CI and the engine pin: maintainers.
 /.github/                 @TheIvoryDisaster
