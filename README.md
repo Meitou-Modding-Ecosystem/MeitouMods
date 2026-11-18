@@ -30,7 +30,7 @@ dotnet test
 
 After a pull that moves the engine pin: `git submodule update --init`.
 
-One click from Visual Studio: open `MeitouMods.slnx` and press F5 on the `Play` project; it builds the engine and mods, copies the mods
+One click from Visual Studio: open `RivalryCore.slnx` and press F5 on the `Play` project; it builds the engine and mods, copies the mods
 into the game and runs it ([docs/play.md](docs/play.md)).
 
 A clone that won't build (empty `engine/`, wrong branch):
