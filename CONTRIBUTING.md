@@ -36,6 +36,6 @@ Don't push to `beta` or `main` directly, rewrite their history, or merge another
 - Mods must stay deterministic: RNG through the engine's hashed RNG, no wall-clock time, no `World` access outside the tick
   (engine `docs/modding.md`).
 - Never commit original game files or data dumps. `.mod` files are git-ignored; a mod built from game data generates its `.mod` on the
-  player's machine (see The Ashen Hand's `AshenHand.Data`).
+  player's machine (see `AshenHand.Data` in the [AshenHand](https://github.com/Meitou-Modding-Ecosystem/AshenHand) repo).
 - Tests use synthetic worlds; a test that needs the game install skips when it is missing.
 - Contributions are licensed GPL-3.0-or-later, like the repo.
