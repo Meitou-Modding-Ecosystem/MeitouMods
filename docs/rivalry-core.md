@@ -1,6 +1,6 @@
 # Rivalry Core (framework mod)
 
-**Status: proposed, mod version 0.6.0, code-mod API 2.** A code mod in `RivalryCore` (id `rivalry.core`) that lets the world's factions
+**Status: proposed, mod version 0.6.1, code-mod API 2.** A code mod in `RivalryCore` (id `rivalry.core`) that lets the world's factions
 inspect the player's setup and act on it: hunt a character, raid a weak rich town, reinforce a town that is losing a fight. Not rival-only: the
 same pipeline sends allies to help and friendly visitors. Built on [dependencies](https://github.com/Meitou-Modding-Ecosystem/MeitouClient/blob/master/docs/modding-dependencies.md); other mods add probes, conditions,
 target kinds, behaviours, rules and directors (see "Extension API"; how-to: [depending on Rivalry Core](depending-on-rivalry-core.md)). Needs the engine hooks of [modding](https://github.com/Meitou-Modding-Ecosystem/MeitouClient/blob/master/docs/modding.md) "World hooks".
@@ -198,7 +198,12 @@ the setting "Friendly parties at once" (`FriendlyPartiesAtOnce`, 1 to 10, defaul
 - The cap is a constant, not an option: a dependent cannot raise it by setting a value. The only way over it is
   `IRivalryRegistry.ExceedHostileCap(source, extra, reason)` in `Initialize`: starts by that source (a rule, director or claim source of the
   registering mod) may go `extra` over; they still count for everyone else. Overrides show in `Rivalry: parties`.
-- Debug rows (`fire rule`, `visit town`) skip the caps.
+- **Rest between hunts**: when the last hostile party ends (its run stops being `Underway`, its ledger entry expires, its claim is released
+  or lapses), no hostile party starts or is claimed for a whole number of game hours rolled uniformly between the settings "Rest between
+  hunts, at least" (`HuntRestMinHours`, default 12) and "at most" (`HuntRestMaxHours`, default 12), each 0 to 168; a ceiling under the floor
+  counts as the floor. Checked every slow step; the roll is the world's hashed RNG. Friendly parties don't rest; overrides don't skip it. A
+  held start logs `held: resting after the last hostile party until <hour> h`; `IRivalryState.HostileRestUntil` gives the hour.
+- Debug rows (`fire rule`, `visit town`) skip the caps and the rest.
 - A mod running a party itself (not as a Rivalry behaviour) counts it with `IRivalryState.ClaimParty(new PartyClaim(source, kind, key, hours,
   faction))`: true when it holds, false when the cap is full (send nothing; ask again later). Renew with the same source and key while the
   party is out; release with `ReleaseParty(source, key)`; an unrenewed claim lapses after `hours`, so a removed mod frees its slot.
@@ -271,17 +276,18 @@ director marks (no run) do not speak.
 ## Options
 
 The switches, assessment period, grudge cooling per hour, hunt threshold, hit squad travel at most, reinforce balance, friendly parties at
-once, raid chance and
+once, rest between hunts (floor and ceiling), raid chance and
 `Announce` (a message per decision) are on the Mod settings page. Everything else in `RivalryOptions` is for dependents. The system copies the options in `Inputs` each tick.
 
 ## Save data
 
-Sidecar system `rivalry`, version 4 (1 to 3 still load): next/last assessment hours, grudges by faction string id and character name +
+Sidecar system `rivalry`, version 5 (1 to 4 still load): next/last assessment hours, grudges by faction string id and character name +
 record id (slots change on load; restored to the first living match in slot order at the first step after the load, unmatched ones dropped),
 cooldowns; since version 2 the next run id and each run (faction by string id, args, and its platoon as template + position: platoon ids change
 on load, so a loaded run takes the nearest platoon of that template and faction no other run holds); since version 3 each grudge's held floor
-and the rival roster (its own layout version 1: leaders, reckonings, each faction's last hit squad hour); since version 4, last, the party
-ledger (kind, source, what, key, faction by string id, town, campaign flag, until). Kill watches are not saved. A renamed
+and the rival roster (its own layout version 1: leaders, reckonings, each faction's last hit squad hour); since version 4 the party
+ledger (kind, source, what, key, faction by string id, town, campaign flag, until); since version 5, last, the rest between hunts (whether
+a hostile party was out, the hour the rest ends). Kill watches are not saved. A renamed
 character loses its grudges across a save made before the rename.
 
 ## Debug rows (F10)

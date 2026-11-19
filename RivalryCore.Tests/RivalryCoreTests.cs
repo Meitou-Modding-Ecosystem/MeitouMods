@@ -409,10 +409,11 @@ public class RivalryCoreTests
     /// <summary>
     /// A world with a standing player character and Rivalry Core's own rules off, so only the dependent's rules send parties.
     /// </summary>
-    static (SimWorld World, RivalrySystem System) MakeSending(Action<IRivalryRegistry> register)
+    static (SimWorld World, RivalrySystem System) MakeSending(Action<IRivalryRegistry> register, Action<RivalryOptions>? tune = null)
     {
         var (world, system, options) = Make(Data(), register: register);
         options.Reinforcements = options.OpportunistRaids = options.Hunters = false;
+        tune?.Invoke(options);
         Spawn(world, "Me", world.Player.Faction, TownAt);
         return (world, system);
     }
@@ -473,7 +474,7 @@ public class RivalryCoreTests
         {
             r.AddBehaviour(new Sending("test.raiders", PartyKind.Hostile));
             r.AddRule(Sends("test.raid", "test.raiders", () => tempted));
-        });
+        }, o => o.HuntRestMinHours = o.HuntRestMaxHours = 0);
         world.RunTicks(1);
         var claim = new PartyClaim("twr.bounty", PartyKind.Hostile, "Me", 100);
         Assert.True(system.ClaimParty(claim));
@@ -503,6 +504,34 @@ public class RivalryCoreTests
 
         Assert.Equal(1, system2.PartiesOut(PartyKind.Hostile));
         Assert.False(system2.ClaimParty(new PartyClaim("twr.reprisal", PartyKind.Hostile, "Me", 100)));
+    }
+
+    [Fact]
+    public void After_a_hostile_party_ends_none_starts_until_the_rest_is_over()
+    {
+        var (world, system) = MakeSending(_ => { });
+        world.RunTicks(1);
+        Assert.True(system.ClaimParty(new PartyClaim("twr.bounty", PartyKind.Hostile, "Me", 100)));
+        world.RunTicks(1);
+
+        Assert.True(system.ReleaseParty("twr.bounty", "Me"));
+        world.RunTicks(1);
+
+        Assert.Equal(world.GameHours + 12, system.HostileRestUntil, 0.01);   // the default floor and ceiling are both 12
+        Assert.False(system.ClaimParty(new PartyClaim("twr.reprisal", PartyKind.Hostile, "Me", 100)));
+        Assert.True(system.ClaimParty(new PartyClaim("test.guests", PartyKind.Friendly, "town1", 100)));   // friendly parties don't rest
+    }
+
+    [Theory]
+    [InlineData(6, 18, 0f, 6)]
+    [InlineData(6, 18, 0.999f, 18)]
+    [InlineData(6, 18, 0.5f, 12)]
+    [InlineData(12, 4, 0.7f, 12)]
+    public void The_rest_is_whole_hours_between_the_floor_and_the_ceiling(int floor, int ceiling, float roll, int hours)
+    {
+        var options = new RivalryOptions { HuntRestMinHours = floor, HuntRestMaxHours = ceiling };
+
+        Assert.Equal(hours, Parties.RestHours(roll, options));
     }
 
     #endregion
