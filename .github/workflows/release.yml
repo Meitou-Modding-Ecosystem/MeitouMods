@@ -1,5 +1,5 @@
 # Releases one mod: a tag <slug>-v<version> (rivalry-core-v0.2.0) builds that mod, checks the version against its meitou.json, and publishes
-# <Mod>-<version>.zip holding the folder to drop into Kenshi/mods/.
+# <Mod>-<version>.zip (with its SHA-256) holding the folder to drop into Kenshi/mods/. Packaging: GutenStructure package-meitou-mod.yml (pinned).
 name: Release
 
 on:
@@ -7,55 +7,42 @@ on:
     tags: ["*-v*"]
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  release:
+  release-gate:
+    permissions:
+      contents: read
+    uses: TheIvoryDisaster/GutenStructure/.github/workflows/release-gate.yml@b61f1f282b7366f06915df81c5012330cdaf9fa3
+
+  mod:
+    needs: release-gate
     runs-on: ubuntu-latest
+    outputs:
+      slug: ${{ steps.mod.outputs.slug }}
+      folder: ${{ steps.mod.outputs.folder }}
+      empty-data-mod: ${{ steps.mod.outputs.empty }}
     steps:
-      - uses: actions/checkout@v5
-        with:
-          submodules: recursive
-
-      - uses: actions/setup-dotnet@v5
-        with:
-          dotnet-version: 11.0.x
-
-      - name: Mod and version
+      - name: Mod for the tag
         id: mod
-        shell: pwsh
         env:
           TAG: ${{ github.ref_name }}
         run: |
-          # Tag slug -> mod folder. Add a line per mod.
-          $mods = @{ 'rivalry-core' = 'RivalryCore'; 'ashen-hand' = 'AshenHand'; 'husbandry' = 'Husbandry' }
-          if ($env:TAG -notmatch '^(?<slug>[a-z0-9-]+)-v(?<version>[0-9A-Za-z.\-]+)$') { throw "bad tag '$env:TAG'" }
-          $folder = $mods[$Matches.slug]
-          if (-not $folder) { throw "no mod for tag slug '$($Matches.slug)'" }
-          $manifest = Get-Content "$folder/meitou.json" -Raw | ConvertFrom-Json
-          if ($manifest.version -ne $Matches.version) { throw "tag version $($Matches.version) is not meitou.json's $($manifest.version)" }
-          "folder=$folder" >> $env:GITHUB_OUTPUT
-          "version=$($Matches.version)" >> $env:GITHUB_OUTPUT
+          echo "slug=${TAG%-v*}" >> "$GITHUB_OUTPUT"
+          # Tag slug -> mod folder and whether it ships an empty .mod (a code mod without data). Add a line per mod.
+          case "${TAG%-v*}" in
+            rivalry-core) echo "folder=RivalryCore" >> "$GITHUB_OUTPUT"; echo "empty=true" >> "$GITHUB_OUTPUT" ;;
+            *) echo "no mod for tag '$TAG'" >&2; exit 1 ;;
+          esac
 
-      - name: Test
-        run: dotnet test -c Release
-
-      - name: Package
-        shell: pwsh
-        env:
-          FOLDER: ${{ steps.mod.outputs.folder }}
-          VERSION: ${{ steps.mod.outputs.version }}
-        run: |
-          $out = "package/$env:FOLDER"
-          dotnet publish "$env:FOLDER" -c Release -o $out
-          # Only the mod's own files: the game supplies its assemblies.
-          Get-ChildItem $out -File | Where-Object { $_.Name -notmatch "^$env:FOLDER\.(dll|pdb|mod)$|^meitou\.json$" } | Remove-Item
-          Get-ChildItem $out -Directory | Remove-Item -Recurse
-          Compress-Archive -Path $out -DestinationPath "$env:FOLDER-$env:VERSION.zip"
-
-      - name: Publish
-        env:
-          GH_TOKEN: ${{ github.token }}
-          FOLDER: ${{ steps.mod.outputs.folder }}
-          VERSION: ${{ steps.mod.outputs.version }}
-        run: gh release create "$GITHUB_REF_NAME" "$FOLDER-$VERSION.zip" --title "$FOLDER $VERSION" --generate-notes
+  release:
+    needs: [mod, release-gate]
+    permissions:
+      contents: write
+    uses: TheIvoryDisaster/GutenStructure/.github/workflows/package-meitou-mod.yml@b61f1f282b7366f06915df81c5012330cdaf9fa3
+    with:
+      mod-folder: ${{ needs.mod.outputs.folder }}
+      slug: ${{ needs.mod.outputs.slug }}
+      channel: release
+      test-project: .
+      empty-data-mod: ${{ needs.mod.outputs.empty-data-mod == 'true' }}
