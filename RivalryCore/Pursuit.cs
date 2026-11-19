@@ -336,10 +336,16 @@ public static class Travel
     /// <summary>
     /// The travel time in game hours to a point.
     /// </summary>
-    public static double Hours(BehaviourContext context, int faction, Vector2 to, BehaviourArgs args)
+    public static double Hours(BehaviourContext context, int faction, Vector2 to, BehaviourArgs args) =>
+        Hours(context.Data, context.Options, faction, to, args.Text("home"));
+
+    /// <summary>
+    /// The travel time in game hours from the faction's base nearest a point (with <paramref name="home"/>'s names, <c>|</c>-separated) to it.
+    /// </summary>
+    public static double Hours(PopulationData data, RivalryOptions options, int faction, Vector2 to, string? home = null)
     {
-        var options = context.Options;
-        if (Base(context, faction, to, args) is not { } from) return Math.Min(options.HuntTravelFallbackHours, options.HuntTravelMaxHours);
+        var names = FactionBases.NamesFor(data, faction, options, RivalLeaders.Split(home));
+        if (FactionBases.Nearest(data, faction, names, to) is not { } from) return Math.Min(options.HuntTravelFallbackHours, options.HuntTravelMaxHours);
 
         double hours = Vector2.Distance(from.Position, to) / Math.Max(1, options.HuntTravelUnitsPerHour);
         return Math.Clamp(hours, Math.Min(options.HuntTravelMinHours, options.HuntTravelMaxHours), options.HuntTravelMaxHours);

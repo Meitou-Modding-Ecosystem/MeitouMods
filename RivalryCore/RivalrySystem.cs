@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Numerics;
 using Meitou.Modding;
 using Meitou.Simulation;
 using Meitou.Simulation.Combat;
@@ -46,6 +47,11 @@ public sealed partial class RivalrySystem : ICombatHitObserver, IStateHashed, IM
     readonly RuleEngine _rules;
     readonly BehaviourRuns _runs;
     readonly Parties _parties;
+
+    /// <summary>
+    /// Who goes next among the hostile candidates (docs/rivalry-core.md "Who goes next").
+    /// </summary>
+    readonly HuntQueue _queue = new();
     readonly PopulationSystem? _population;
     readonly HunterBarks _barks;
     readonly SquadMemory? _memory;
@@ -163,7 +169,7 @@ public sealed partial class RivalrySystem : ICombatHitObserver, IStateHashed, IM
     void PublishView(World world)
     {
         _viewDue = false;
-        Debug = DebugView.Build(world, _data, Report, Notoriety, _cooldowns, _runs.All, Rivals, _rules.Views, _options, _memory, _parties);
+        Debug = DebugView.Build(world, _data, Report, Notoriety, _cooldowns, _runs.All, Rivals, _rules.Views, _options, _memory, _parties, Waiting);
     }
 
     void AddGrudge(GrudgeCommand g)
@@ -266,7 +272,7 @@ public sealed partial class RivalrySystem : ICombatHitObserver, IStateHashed, IM
     /// </summary>
     void Fire(World world, FireRuleCommand fire, List<Decision> decided)
     {
-        string line = _rules.Fire(NewAssessment(world, decided), fire.Rule, TownKey(fire.Key), decided, _cooldowns);
+        string line = _rules.Fire(NewAssessment(world, decided, []), fire.Rule, TownKey(fire.Key), decided, _cooldowns);
         Remember($"debug: {line} (party caps skipped)");
     }
 
@@ -321,10 +327,11 @@ public sealed partial class RivalrySystem : ICombatHitObserver, IStateHashed, IM
     }
 
     /// <summary>
-    /// What the rules and directors see; <paramref name="pending"/> holds the decisions recorded so far, which count as parties out.
+    /// What the rules and directors see; <paramref name="pending"/> holds the decisions recorded so far, which count as parties out, and
+    /// <paramref name="proposals"/> collects the hostile candidates.
     /// </summary>
-    Assessment NewAssessment(World world, IReadOnlyList<Decision> pending) =>
-        new(world, _data, Report, Notoriety, _options, _purpose, _catalogue, Rivals, _runs.All, _parties, pending);
+    Assessment NewAssessment(World world, IReadOnlyList<Decision> pending, List<Proposal> proposals) =>
+        new(world, _data, Report, Notoriety, _options, _purpose, _catalogue, Rivals, _runs.All, _parties, pending, proposals);
 
     BehaviourContext Context(World world) =>
         new(world, _data, Report, _options, _purpose, _actions, _runs, _population, _inspector, Notoriety, Rivals);
@@ -332,7 +339,8 @@ public sealed partial class RivalrySystem : ICombatHitObserver, IStateHashed, IM
     List<Decision> Decide(World world)
     {
         var decided = new List<Decision>();
-        var assessment = NewAssessment(world, decided);
+        var proposals = new List<Proposal>();
+        var assessment = NewAssessment(world, decided, proposals);
         _rules.Evaluate(assessment, decided, _cooldowns);
         foreach (var director in _directors)
         {
@@ -347,8 +355,58 @@ public sealed partial class RivalrySystem : ICombatHitObserver, IStateHashed, IM
                 _log($"director {director.Name} threw and is off for this world: {e.Message}");
             }
         }
+
+        SendNext(assessment, proposals);
         return decided;
     }
+
+    /// <summary>
+    /// Sends the best hostile candidates the caps admit, best first (one while the cap is one); the others wait their turn. Another mod's
+    /// candidate that goes is given a claim.
+    /// </summary>
+    void SendNext(Assessment a, List<Proposal> proposals)
+    {
+        double now = a.GameHours;
+        var external = _queue.External(now, ExternalKeepHours).Select(c => new Proposal(c, () => Grant(c, now)));
+        var ranked = _queue.Rank(proposals.Concat(external), p => p.Candidate, now, _options);
+        foreach (var proposal in ranked)
+        {
+            if (!a.MayStart(PartyKind.Hostile, proposal.Candidate.Source)) continue;
+            if (Dispatch(proposal)) _queue.Sent(proposal.Candidate);
+        }
+        Waiting = _queue.Latest;
+    }
+
+    /// <summary>
+    /// Runs a candidate's dispatch; a dispatch that throws is logged and counts as not sent.
+    /// </summary>
+    bool Dispatch(Proposal proposal)
+    {
+        try
+        {
+            return proposal.Dispatch();
+        }
+        catch (Exception e)
+        {
+            _log($"{proposal.Candidate.Source}: sending {proposal.Candidate.Key} failed: {e.Message}");
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Gives another mod's winning candidate its claim.
+    /// </summary>
+    bool Grant(HostileCandidate c, double now)
+    {
+        bool held = _parties.Claim(Claim(c), PartiesOut(PartyKind.Hostile), _options, now);
+        if (held) Remember($"{c.Source}: {c.Key} goes next (claim for {c.ClaimHours:0.#} h)");
+        return held;
+    }
+
+    /// <summary>
+    /// The game hours another mod's candidate stays in the queue after it was last proposed.
+    /// </summary>
+    double ExternalKeepHours => 2 * Math.Max(1, _options.AssessEveryHours);
 
     /// <summary>
     /// Carries out a decision and logs it; <paramref name="capped"/>: one that would send a party over its kind's cap is held instead (the debug
@@ -425,6 +483,33 @@ public sealed partial class RivalrySystem : ICombatHitObserver, IStateHashed, IM
         return held;
     }
 
+    public bool Propose(HostileCandidate candidate)
+    {
+        ArgumentNullException.ThrowIfNull(candidate);
+        if (_world is not { } world) return false;
+        if (_parties.Holds(candidate.Source, candidate.Key)) return ClaimParty(Claim(candidate));
+
+        _queue.Propose(candidate, world.GameHours);
+        return false;
+    }
+
+    /// <summary>
+    /// The claim a winning candidate holds.
+    /// </summary>
+    static PartyClaim Claim(HostileCandidate c) => new(c.Source, PartyKind.Hostile, c.Key, c.ClaimHours, c.Faction);
+
+    public double TravelHours(int faction, CharacterId target) =>
+        _world is { } world && world.Characters.TryResolveNext(target, out int slot)
+            ? Travel.Hours(_data, _options, faction, ToGround(world.Characters.Next[slot].Position))
+            : Math.Min(_options.HuntTravelFallbackHours, _options.HuntTravelMaxHours);
+
+    public IReadOnlyList<WaitingView> Waiting { get; private set; } = [];
+
+    /// <summary>
+    /// A world position on the ground plane.
+    /// </summary>
+    static Vector2 ToGround(Vector3 p) => new(p.X, p.Z);
+
     public bool ReleaseParty(string source, string key)
     {
         bool released = _parties.Release(source, key);
@@ -442,5 +527,6 @@ public sealed partial class RivalrySystem : ICombatHitObserver, IStateHashed, IM
         _runs.Hash(ref h);
         Rivals.Hash(ref h);
         _parties.Hash(ref h);
+        _queue.Hash(ref h);
     }
 }
