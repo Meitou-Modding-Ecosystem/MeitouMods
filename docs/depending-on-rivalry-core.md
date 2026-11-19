@@ -114,7 +114,8 @@ compiler never ties to Rivalry Core.
 "dependencies": [{ "id": "rivalry.core", "version": ">=0.6.0 <0.7.0" }]
 ```
 
-- Before 1.0 a minor version may break the API, so cap the range at the next minor. 0.6.0 is the first version with party caps.
+- Before 1.0 a minor version may break the API, so cap the range at the next minor. 0.6.0 is the first version with party caps; 0.6.1 adds
+  the rest between hunts (`HostileRestUntil`).
 - Rivalry Core must sit above your mod in `data/mods.cfg`; the launcher and loader say "move X above it" otherwise.
 
 ## 3. Two ways players get it
@@ -174,14 +175,15 @@ Details: [rivalry-core.md "Party caps"](rivalry-core.md#party-caps).
 ```csharp
 var state = rivalry.In(world);                        // in your system's serial step
 var claim = new PartyClaim($"{c.Id}.bounty", PartyKind.Hostile, characterName, hours: 6, faction);
-if (state?.ClaimParty(claim) != true) return;         // cap full: send nothing now, ask again later
+if (state?.ClaimParty(claim) != true) return;         // cap full or resting: send nothing now, ask again later
 // ... while the crew is out, call ClaimParty(claim) again within 6 h; when it ends:
 state.ReleaseParty(claim.Source, claim.Key);
 ```
 
 - **Going over the cap**: only on purpose, in `Initialize`: `mine.ExceedHostileCap($"{c.Id}.siege", 1, "the siege brings its own scouts")`.
   The source may send one more than the cap; its parties still count for everyone else. `Rivalry: parties` (F10) lists every override.
-- **Seeing it**: `IRivalryState.Parties`, `PartiesOut(kind)`, `PartyCap(kind)`; F10 `Rivalry: parties` and `Rivalry: log` (`held: ...`).
+- **Seeing it**: `IRivalryState.Parties`, `PartiesOut(kind)`, `PartyCap(kind)`, `HostileRestUntil`; F10 `Rivalry: parties` and
+  `Rivalry: log` (`held: ...`).
 
 
 ### Packaging publication checks

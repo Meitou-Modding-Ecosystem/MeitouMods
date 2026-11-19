@@ -71,7 +71,7 @@ public sealed class Assessment
     /// Whether <paramref name="source"/> (a rule's or director's name) may send one more party of the kind now: under the cap, or under its
     /// override. Check it before claiming a cooldown: a start over the cap is refused when carried out, and the cooldown would be spent.
     /// </summary>
-    public bool MayStart(PartyKind kind, string source) => _parties.Admits(kind, source, PartiesOut(kind), Options);
+    public bool MayStart(PartyKind kind, string source) => _parties.Admits(kind, source, PartiesOut(kind), Options, GameHours);
 
     /// <summary>
     /// The party kind of a behaviour by name; none when it is not registered.

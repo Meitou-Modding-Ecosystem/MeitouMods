@@ -44,6 +44,14 @@ public sealed class RivalryOptions
         Min = Parties.FriendlyMin, Max = Parties.FriendlyMax, Step = 1)]
     public int FriendlyPartiesAtOnce { get; set; } = 3;
 
+    [Setting("Rest between hunts, at least (game hours)", Hint = "After a hostile party ends, none comes for at least this long.",
+        Min = 0, Max = Parties.RestMax, Step = 1)]
+    public int HuntRestMinHours { get; set; } = 12;
+
+    [Setting("Rest between hunts, at most (game hours)", Hint = "The rest is a random whole number of hours from the floor to this.",
+        Min = 0, Max = Parties.RestMax, Step = 1)]
+    public int HuntRestMaxHours { get; set; } = 12;
+
     [Setting("Opportunist raid chance per day", Min = 0, Max = 2, Step = 0.05)]
     public float RaidChancePerDay { get; set; } = 0.25f;
 

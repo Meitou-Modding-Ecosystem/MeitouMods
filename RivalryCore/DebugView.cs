@@ -64,12 +64,13 @@ public sealed record DebugView(
     IReadOnlyList<(string Faction, double HoursAgo)> LastHitSquads,
     IReadOnlyList<PartyView> Parties,
     int FriendlyCap,
-    IReadOnlyList<CapOverride> Overrides)
+    IReadOnlyList<CapOverride> Overrides,
+    double RestUntil)
 {
     /// <summary>
     /// Before the first step of a world.
     /// </summary>
-    public static readonly DebugView Empty = new(0, 0, [], [], [], [], [], [], [], [], 0, []);
+    public static readonly DebugView Empty = new(0, 0, [], [], [], [], [], [], [], [], 0, [], 0);
 
     #region Building
 
@@ -95,7 +96,8 @@ public sealed record DebugView(
             [.. data.Factions.Select(f => (f.Name, rivals.HoursSinceEnded(f.Id, now))).Where(l => double.IsFinite(l.Item2))],
             [.. parties.Out(runs, report, now)],
             Rivalry.Parties.Cap(PartyKind.Friendly, options),
-            parties.Overrides);
+            parties.Overrides,
+            parties.RestUntil);
     }
 
     /// <summary>
@@ -191,7 +193,8 @@ public sealed record DebugView(
         string hostile = PartiesOf(PartyKind.Hostile, Rivalry.Parties.HostileCap);
         string friendly = PartiesOf(PartyKind.Friendly, FriendlyCap);
         string overrides = Overrides.Count > 0 ? $"; over the hostile cap: {string.Join(", ", Overrides)}" : "";
-        return $"hostile parties {hostile}; friendly parties {friendly}{overrides}";
+        string rest = RestUntil > GameHours ? $" (resting {Hours(RestUntil - GameHours)} more)" : "";
+        return $"hostile parties {hostile}{rest}; friendly parties {friendly}{overrides}";
     }
 
     /// <summary>

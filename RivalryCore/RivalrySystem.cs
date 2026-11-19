@@ -208,7 +208,18 @@ public sealed partial class RivalrySystem : ICombatHitObserver, IStateHashed, IM
     {
         if (_runs.All.Count > 0) _runs.Step(Context(world));
         Rivals.Idle(_runs.All.Where(r => r.Args.Text("leaderName") is not null).Select(LeaderOf));
+        LookForRest(world);
         PublishRuns();
+    }
+
+    /// <summary>
+    /// Starts the rest between hunts once the last hostile party has ended (<see cref="Rivalry.Parties.Look"/>).
+    /// </summary>
+    void LookForRest(World world)
+    {
+        int hostile = _parties.Count(PartyKind.Hostile, _runs.All, Report, world.GameHours);
+        float roll = Rng.Float(Rng.Hash(world.Seed, (ulong)world.Tick, _purpose, Rng.StableHash("rivalry.rest")));
+        _parties.Look(hostile, world.GameHours, roll, _options);
     }
 
     /// <summary>
@@ -375,7 +386,8 @@ public sealed partial class RivalrySystem : ICombatHitObserver, IStateHashed, IM
         if (kind == PartyKind.None) return null;
 
         int count = _parties.Count(kind, _runs.All, Report, world.GameHours);
-        if (_parties.Admits(kind, decision.Director, count, _options)) return null;
+        if (_parties.Admits(kind, decision.Director, count, _options, world.GameHours)) return null;
+        if (_parties.Resting(world.GameHours)) return $"held: resting after the last hostile party until {_parties.RestUntil:0.#} h";
 
         string what = decision is StartDecision s ? s.Behaviour : KindName(decision);
         return $"held: {what} would be {kind.ToString().ToLowerInvariant()} party {count + 1} of {Rivalry.Parties.Cap(kind, _options)}";
@@ -400,6 +412,8 @@ public sealed partial class RivalrySystem : ICombatHitObserver, IStateHashed, IM
     public int PartiesOut(PartyKind kind) => _world is { } world ? _parties.Count(kind, _runs.All, Report, world.GameHours) : 0;
 
     public int PartyCap(PartyKind kind) => Rivalry.Parties.Cap(kind, _options);
+
+    public double HostileRestUntil => _parties.RestUntil;
 
     public bool ClaimParty(PartyClaim claim)
     {

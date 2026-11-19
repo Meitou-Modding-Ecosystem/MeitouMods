@@ -72,6 +72,12 @@ public interface IRivalryState
     int PartyCap(PartyKind kind);
 
     /// <summary>
+    /// The game hour the rest after the last hostile party ends: no hostile party starts or is claimed before it (the settings "Rest between
+    /// hunts", floor and ceiling).
+    /// </summary>
+    double HostileRestUntil { get; }
+
+    /// <summary>
     /// Counts a party the calling mod runs itself under the caps, or renews its claim of the same source and key: true when it holds. False:
     /// the cap is full (send nothing now and ask again later). The claim lapses <see cref="PartyClaim.Hours"/> after it was made or renewed, so
     /// renew it while the party is out and release it when it ends.
