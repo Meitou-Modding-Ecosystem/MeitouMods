@@ -65,12 +65,13 @@ public sealed record DebugView(
     IReadOnlyList<PartyView> Parties,
     int FriendlyCap,
     IReadOnlyList<CapOverride> Overrides,
-    double RestUntil)
+    double RestUntil,
+    IReadOnlyList<WaitingView> Waiting)
 {
     /// <summary>
     /// Before the first step of a world.
     /// </summary>
-    public static readonly DebugView Empty = new(0, 0, [], [], [], [], [], [], [], [], 0, [], 0);
+    public static readonly DebugView Empty = new(0, 0, [], [], [], [], [], [], [], [], 0, [], 0, []);
 
     #region Building
 
@@ -79,7 +80,7 @@ public sealed record DebugView(
     /// </summary>
     internal static DebugView Build(World world, PopulationData data, PlayerReport report, NotorietyLedger ledger, Cooldowns cooldowns,
         IReadOnlyList<BehaviourRun> runs, RivalRoster rivals, IReadOnlyList<RuleView> rules, RivalryOptions options, SquadMemory? memory,
-        Parties parties)
+        Parties parties, IReadOnlyList<WaitingView> waiting)
     {
         double now = world.GameHours;
         string FactionName(int f) => f >= 0 && f < data.Factions.Count ? data.Factions[f].Name : "no faction";
@@ -97,7 +98,8 @@ public sealed record DebugView(
             [.. parties.Out(runs, report, now)],
             Rivalry.Parties.Cap(PartyKind.Friendly, options),
             parties.Overrides,
-            parties.RestUntil);
+            parties.RestUntil,
+            waiting);
     }
 
     /// <summary>
@@ -186,7 +188,7 @@ public sealed record DebugView(
     }
 
     /// <summary>
-    /// The parties out against each cap, and the mods allowed over the hostile one.
+    /// The parties out against each cap, the hostile candidates waiting their turn, and the mods allowed over the hostile cap.
     /// </summary>
     public string DescribeParties()
     {
@@ -194,7 +196,8 @@ public sealed record DebugView(
         string friendly = PartiesOf(PartyKind.Friendly, FriendlyCap);
         string overrides = Overrides.Count > 0 ? $"; over the hostile cap: {string.Join(", ", Overrides)}" : "";
         string rest = RestUntil > GameHours ? $" (resting {Hours(RestUntil - GameHours)} more)" : "";
-        return $"hostile parties {hostile}{rest}; friendly parties {friendly}{overrides}";
+        string waiting = Waiting.Count > 0 ? $"; waiting: {string.Join(", ", Waiting)}" : "";
+        return $"hostile parties {hostile}{rest}{waiting}; friendly parties {friendly}{overrides}";
     }
 
     /// <summary>

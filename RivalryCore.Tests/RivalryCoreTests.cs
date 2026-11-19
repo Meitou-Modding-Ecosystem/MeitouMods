@@ -535,4 +535,101 @@ public class RivalryCoreTests
     }
 
     #endregion
+
+    #region Who goes next
+
+    /// <summary>
+    /// A rule like <see cref="Sends"/> whose hostile start scores <paramref name="grudge"/>.
+    /// </summary>
+    static Rule Scores(string name, string behaviour, float grudge, Func<bool>? when = null) => new()
+    {
+        Name = name,
+        Behaviour = behaviour,
+        When = (_, _) => when?.Invoke() != false,
+        CooldownHours = _ => 1000,
+        Faction = (a, _) => a.Data.FactionIndex("61-a"),
+        Grudge = (_, _) => grudge,
+    };
+
+    /// <summary>
+    /// Ranks the candidates at <paramref name="now"/> and sends the best, as an assessment does.
+    /// </summary>
+    static HostileCandidate SendBest(HuntQueue queue, double now, params HostileCandidate[] candidates)
+    {
+        var best = queue.Rank(candidates, c => c, now, new RivalryOptions())[0];
+        queue.Sent(best);
+        return best;
+    }
+
+    [Fact]
+    public void A_near_grudge_goes_before_a_larger_far_one_until_the_far_one_has_waited()
+    {
+        var queue = new HuntQueue();
+        var far = new HostileCandidate("test.far", "Me", 2, 80, 20);    // 80 - 2 x 20 = 40
+        var near = new HostileCandidate("test.near", "Me", 1, 60, 2);   // 60 - 2 x 2 = 56
+
+        Assert.Equal(near, SendBest(queue, 0, far, near));
+
+        // Thirty hours later the far grudge scores 40 + 30 = 70 against a fresh near one's 56.
+        Assert.Equal(far, SendBest(queue, 30, far, near with { Key = "You" }));
+    }
+
+    [Fact]
+    public void A_waits_age_survives_a_save_and_is_forgotten_after_a_day_unproposed()
+    {
+        var queue = new HuntQueue();
+        var waiting = new HostileCandidate("test.raid", "town1", 1, 10, 0);
+        queue.Rank([waiting], c => c, 5, new RivalryOptions());
+
+        var stream = new MemoryStream();
+        queue.Write(new BinaryWriter(stream));
+        stream.Position = 0;
+        var loaded = new HuntQueue();
+        loaded.Read(new BinaryReader(stream));
+        Assert.Equal(5, loaded.Since(waiting, 20));
+
+        loaded.Rank<HostileCandidate>([], c => c, 5 + HuntQueue.ForgetHours + 1, new RivalryOptions());
+        Assert.Equal(40, loaded.Since(waiting, 40));
+    }
+
+    [Fact]
+    public void The_larger_grudge_goes_first_whatever_the_rule_order_and_the_other_waits()
+    {
+        var (world, system) = MakeSending(r =>
+        {
+            r.AddBehaviour(new Sending("test.raiders", PartyKind.Hostile));
+            r.AddRule(Scores("test.small", "test.raiders", 10));
+            r.AddRule(Scores("test.big", "test.raiders", 50));
+        });
+
+        world.RunTicks(2);
+
+        Assert.Equal("test.big", Assert.Single(system.Parties).Source);
+        Assert.Equal("test.small", Assert.Single(system.Waiting).Source);
+        Assert.Contains("waiting: test.small -> town1", system.Debug.DescribeParties());
+    }
+
+    [Fact]
+    public void Another_mods_candidate_that_wins_is_given_a_claim()
+    {
+        bool tempted = false;
+        var (world, system) = MakeSending(r =>
+        {
+            r.AddBehaviour(new Sending("test.raiders", PartyKind.Hostile));
+            r.AddRule(Scores("test.raid", "test.raiders", 10, () => tempted));
+        });
+        world.RunTicks(1);
+        tempted = true;
+        var bounty = new HostileCandidate("twr.bounty", "Me", -1, 200, system.TravelHours(-1, CharacterId.None), ClaimHours: 50);
+
+        Assert.False(system.Propose(bounty));   // waits for the next assessment
+        world.Commands.Enqueue(new AssessNowCommand { Tick = world.Tick });
+        world.RunTicks(2);
+
+        Assert.True(system.Propose(bounty));
+        Assert.Equal("twr.bounty", Assert.Single(system.Parties).Source);
+        Assert.Equal("test.raid", Assert.Single(system.Waiting).Source);
+    }
+
+    #endregion
 }

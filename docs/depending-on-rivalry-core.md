@@ -115,7 +115,7 @@ compiler never ties to Rivalry Core.
 ```
 
 - Before 1.0 a minor version may break the API, so cap the range at the next minor. 0.6.0 is the first version with party caps; 0.6.1 adds
-  the rest between hunts (`HostileRestUntil`).
+  the rest between hunts (`HostileRestUntil`); 0.6.2 who goes next (`Propose`, `Rule.Grudge`, `Assessment.Propose`).
 - Rivalry Core must sit above your mod in `data/mods.cfg`; the launcher and loader say "move X above it" otherwise.
 
 ## 3. Two ways players get it
@@ -145,7 +145,7 @@ public void Initialize(ModContext c)
         Name = $"{c.Id}.collectors",
         Target = BuiltIn.CharacterTarget,
         When = (a, t) => a.Notoriety.Grudge(a.Data.FactionIndex("1234-mymod.mod"), t.Character) >= a.Options.HuntThreshold,
-        Behaviour = BuiltIn.Pursue,                    // hostile: counted under the cap
+        Behaviour = BuiltIn.Pursue,                    // hostile: counted under the cap, waits its turn
         CooldownHours = _ => 48,
         Faction = (a, _) => a.Data.FactionIndex("1234-mymod.mod"),
         Args = (_, _) => new BehaviourArgs().Set("template", "5678-mymod.mod"),
@@ -167,22 +167,37 @@ Details: [rivalry-core.md "Party caps"](rivalry-core.md#party-caps).
 - **Using a built-in behaviour or decision**: nothing to do. `pursue`, `burgle`, `raid`, `hunt` are hostile; `visit`, `reinforce` friendly.
 - **Your own behaviour**: declare `public PartyKind Party => PartyKind.Hostile;` (or `Friendly`). Override `Underway(run)` when a run stops
   counting before it ends (as a hit squad does once beaten). A behaviour that sends people and declares `None` slips past the cap: don't.
-- **Your own director**: check `assessment.MayStart(PartyKind.Hostile, Name)` before `TryClaim`; a start over the cap is held when carried
-  out and the cooldown is spent.
-- **A party your mod runs itself** (its own pursuit code, not a Rivalry behaviour): claim a slot before sending, renew it while out,
-  release it after.
+- **Who goes first**: hostile candidates from every mod are ranked by grudge − 2 × travel hours + 1 × hours waited
+  ([rivalry-core.md "Who goes next"](rivalry-core.md#who-goes-next)). A hostile rule is a candidate by itself; set `Rule.Grudge` when the
+  faction's grudge against the target is not what should rank it.
+- **Your own director**: propose hostile parties instead of deciding them, and claim the cooldown in the dispatch; for friendly ones check
+  `assessment.MayStart(PartyKind.Friendly, Name)` before `TryClaim`.
+
+```csharp
+var at = a.Report.Find(who)!.Position;
+var candidate = new HostileCandidate(Name, key, faction, grudge, a.TravelHours(faction, at));
+a.Propose(candidate, () => { if (d.TryClaim(key, 48)) d.Start(BuiltIn.Pursue, target, args); });
+```
+
+- **A party your mod runs itself** (its own pursuit code, not a Rivalry behaviour): propose it, send it once it holds the slot, renew the
+  claim while out, release it after.
 
 ```csharp
 var state = rivalry.In(world);                        // in your system's serial step
-var claim = new PartyClaim($"{c.Id}.bounty", PartyKind.Hostile, characterName, hours: 6, faction);
-if (state?.ClaimParty(claim) != true) return;         // cap full or resting: send nothing now, ask again later
-// ... while the crew is out, call ClaimParty(claim) again within 6 h; when it ends:
-state.ReleaseParty(claim.Source, claim.Key);
+var key = characterName;
+var travel = state?.TravelHours(faction, characterId) ?? 0;
+var candidate = new HostileCandidate($"{c.Id}.bounty", key, faction, grudge, travel, ClaimHours: 6);
+if (state?.Propose(candidate) != true) return;        // waiting its turn (or resting): propose again next assessment
+// ... send the crew; while it is out, call ClaimParty(new PartyClaim(candidate.Source, PartyKind.Hostile, key, 6, faction)) within 6 h:
+state.ReleaseParty(candidate.Source, key);            // when it ends
 ```
+
+- `ClaimParty` alone still works (it takes a free slot at once, skipping the queue); use it only for a party that cannot wait, such as one
+  already under way when your mod loads.
 
 - **Going over the cap**: only on purpose, in `Initialize`: `mine.ExceedHostileCap($"{c.Id}.siege", 1, "the siege brings its own scouts")`.
   The source may send one more than the cap; its parties still count for everyone else. `Rivalry: parties` (F10) lists every override.
-- **Seeing it**: `IRivalryState.Parties`, `PartiesOut(kind)`, `PartyCap(kind)`, `HostileRestUntil`; F10 `Rivalry: parties` and
+- **Seeing it**: `IRivalryState.Parties`, `PartiesOut(kind)`, `PartyCap(kind)`, `HostileRestUntil`, `Waiting`; F10 `Rivalry: parties` and
   `Rivalry: log` (`held: ...`).
 
 

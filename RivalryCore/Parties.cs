@@ -233,6 +233,11 @@ internal sealed class Parties(IReadOnlyDictionary<string, IBehaviour> behaviours
     }
 
     /// <summary>
+    /// Whether another mod holds a claim of the source and key.
+    /// </summary>
+    public bool Holds(string source, string key) => _ledger.Any(e => e.What == ClaimWhat && e.Source == source && e.Key == key);
+
+    /// <summary>
     /// Ends another mod's claim; false when it held none.
     /// </summary>
     public bool Release(string source, string key) => _ledger.RemoveAll(e => e.What == ClaimWhat && e.Source == source && e.Key == key) > 0;

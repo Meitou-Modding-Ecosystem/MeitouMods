@@ -88,4 +88,22 @@ public interface IRivalryState
     /// Ends a claim made with <see cref="ClaimParty"/>; false when there was none.
     /// </summary>
     bool ReleaseParty(string source, string key);
+
+    /// <summary>
+    /// Puts a hostile party the calling mod would send now in the queue of who goes next (docs/rivalry-core.md "Who goes next"): true when it
+    /// won and holds a claim of <see cref="HostileCandidate.ClaimHours"/> (send it now, renew with <see cref="ClaimParty"/> while it is out,
+    /// release it when it ends). False: it waits; propose it again at least every assessment while it still wants to go, or it is dropped.
+    /// </summary>
+    bool Propose(HostileCandidate candidate);
+
+    /// <summary>
+    /// The travel time in game hours from the faction's base nearest the character to it (the same rule as Rivalry Core's own hunters); for a
+    /// <see cref="HostileCandidate"/>'s <see cref="HostileCandidate.TravelHours"/>. Serial steps only.
+    /// </summary>
+    double TravelHours(int faction, CharacterId target);
+
+    /// <summary>
+    /// The hostile candidates of the latest assessment, best first, with their scores and the hours each has waited. A copy.
+    /// </summary>
+    IReadOnlyList<WaitingView> Waiting { get; }
 }
