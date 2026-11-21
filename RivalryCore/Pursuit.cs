@@ -84,7 +84,7 @@ public sealed class PursueBehaviour : IBehaviour
         context.Notoriety.HoldFloor(run.Faction, quarry, context.Options.HuntThreshold);
 
         var at = context.World.Characters.Next[slot].Position;
-        double hours = Travel.Hours(context, run.Faction, new Vector2(at.X, at.Z), run.Args);
+        double hours = Travel.Hours(context, run.Faction, at.Flat(), run.Args);
         run.Args.Set("travelHours", hours);
         run.Phase = hours > 0 ? Travelling : Spawning;
         run.Until = context.World.GameHours + (hours > 0 ? hours : SpawnWindowHours);
@@ -184,8 +184,7 @@ public sealed class PursueBehaviour : IBehaviour
         var world = context.World;
         if (context.Population is not { } population || Quarry(context, run) is not { IsNone: false } quarry) return false;
 
-        var position = world.Characters.Next[quarry.Slot].Position;
-        var at = new Vector2(position.X, position.Z);
+        var at = world.Characters.Next[quarry.Slot].Position.Flat();
         int site = HomeSite(context, run, at);
         float min = (float)run.Args.Number("minRadius", context.Options.HuntSpawnMinRadius);
         float max = (float)run.Args.Number("maxRadius", context.Options.HuntSpawnMaxRadius);
@@ -295,11 +294,11 @@ public sealed class PursueBehaviour : IBehaviour
     static bool Seen(BehaviourContext context, Squad squad)
     {
         var table = context.World.Characters;
-        var members = squad.Members.Where(id => table.TryResolveNext(id, out _)).Select(id => Ground(table, id)).ToList();
+        var members = squad.Members.Where(id => table.TryResolveNext(id, out _)).Select(id => FlatAt(table, id)).ToList();
         foreach (var c in context.Report.Characters)
         {
             if (!table.TryResolveNext(c.Id, out int slot) || table.Cold(slot) is not { Medical.Incapacitated: false }) continue;
-            if (members.Any(m => Vector2.Distance(m, Ground(table, c.Id)) <= context.Options.SeenRange)) return true;
+            if (members.Any(m => Vector2.Distance(m, FlatAt(table, c.Id)) <= context.Options.SeenRange)) return true;
         }
 
         return false;
@@ -308,11 +307,7 @@ public sealed class PursueBehaviour : IBehaviour
     /// <summary>
     /// A character's position now on the ground plane.
     /// </summary>
-    static Vector2 Ground(CharacterTable table, CharacterId id)
-    {
-        var at = table.Next[id.Slot].Position;
-        return new Vector2(at.X, at.Z);
-    }
+    static Vector2 FlatAt(CharacterTable table, CharacterId id) => table.Next[id.Slot].Position.Flat();
 
     /// <summary>
     /// Lets the quarry's grudge cool freely again; with the quarry not found, every floor the faction holds.

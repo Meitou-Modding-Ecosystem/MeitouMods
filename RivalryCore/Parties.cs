@@ -333,7 +333,7 @@ internal sealed class Parties(IReadOnlyDictionary<string, IBehaviour> behaviours
             w.Write(e.Source);
             w.Write(e.What);
             w.Write(e.Key);
-            w.Write(e.Faction >= 0 && e.Faction < data.Factions.Count ? data.Factions[e.Faction].Id : "");
+            w.Write(data.FactionAt(e.Faction)?.Id ?? "");
             w.Write(e.Town);
             w.Write(e.Campaign);
             w.Write(e.Until);

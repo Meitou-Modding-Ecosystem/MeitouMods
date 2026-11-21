@@ -5,6 +5,7 @@ using Meitou.Data.Fcs;
 using Meitou.Modding;
 using Meitou.Simulation;
 using Meitou.Simulation.Factions;
+using Meitou.Simulation.Movement;
 using Meitou.Simulation.Population;
 using SimWorld = Meitou.Simulation.World;
 
@@ -629,6 +630,33 @@ public class RivalryCoreTests
         Assert.True(system.Propose(bounty));
         Assert.Equal("twr.bounty", Assert.Single(system.Parties).Source);
         Assert.Equal("test.raid", Assert.Single(system.Waiting).Source);
+    }
+
+    #endregion
+
+    #region Squad driving
+
+    [Fact]
+    public void A_redirected_walk_keeps_its_path_until_the_goal_moves_past_the_slack()
+    {
+        var (world, _, _) = Make(Data());
+        var hunter = Spawn(world, "Hunter", world.Player.Faction + 1, TownAt);
+        world.RunTicks(1);
+        int slot = hunter.Slot;
+        var goal = TownAt + new Vector3(500, 0, 0);
+
+        Assert.False(SquadDriver.WalkTo(world, slot, goal, run: true, redirect: true));
+        Assert.Equal((byte)CharacterTask.GoTo, world.Characters.Next[slot].Task);
+
+        // This world has no movement system: stand in for the walk it would have set up, and mark it to see whether a new one starts.
+        world.Characters.Next[slot].Goal = new Vector2(goal.X, goal.Z);
+        world.Characters.Next[slot].TaskTime = 99;
+
+        SquadDriver.WalkTo(world, slot, goal + new Vector3(SquadDriver.RedirectSlack / 2, 0, 0), run: true, redirect: true);
+        Assert.Equal(99, world.Characters.Next[slot].TaskTime);   // moved within the slack: the same walk
+
+        SquadDriver.WalkTo(world, slot, goal + new Vector3(SquadDriver.RedirectSlack * 3, 0, 0), run: true, redirect: true);
+        Assert.Equal(0, world.Characters.Next[slot].TaskTime);    // moved past it: a new walk
     }
 
     #endregion

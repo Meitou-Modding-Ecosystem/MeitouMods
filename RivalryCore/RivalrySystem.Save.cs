@@ -14,6 +14,11 @@ public sealed partial class RivalrySystem
     readonly record struct Subject(string Name, string Record);
 
     readonly Dictionary<CharacterId, Subject> _subjects = [];
+
+    /// <summary>
+    /// <see cref="NotorietyLedger.Started"/> when every grudge last had a subject named.
+    /// </summary>
+    int _namedAt = -1;
     List<SavedGrudge>? _pending;
 
     public void Write(Stream stream)
@@ -146,11 +151,27 @@ public sealed partial class RivalrySystem
         return CharacterId.None;
     }
 
+    /// <summary>
+    /// Notes the name and record of everyone held a grudge against, for the save; only after a new grudge started, until all are named.
+    /// </summary>
     void NameSubjects(World world)
     {
-        if (Notoriety.Entries.All(g => _subjects.ContainsKey(g.Key.Who))) return;
+        if (Notoriety.Started == _namedAt) return;
+        if (!Notoriety.Entries.All(g => _subjects.ContainsKey(g.Key.Who))) Rename(world);
+        if (Notoriety.Entries.All(g => _subjects.ContainsKey(g.Key.Who))) _namedAt = Notoriety.Started;
+    }
+
+    /// <summary>
+    /// Names every character held a grudge against afresh.
+    /// </summary>
+    void Rename(World world)
+    {
         _subjects.Clear();
         foreach (var (key, _) in Notoriety.Entries)
-            if (world.Characters.TryResolveNext(key.Who, out int slot) && world.Characters.Cold(slot) is { } c) _subjects[key.Who] = new Subject(c.Name, c.RecordId);
+        {
+            if (!world.Characters.TryResolveNext(key.Who, out int slot) || world.Characters.Cold(slot) is not { } c) continue;
+
+            _subjects[key.Who] = new Subject(c.Name, c.RecordId);
+        }
     }
 }

@@ -83,14 +83,15 @@ public sealed record DebugView(
         Parties parties, IReadOnlyList<WaitingView> waiting)
     {
         double now = world.GameHours;
-        string FactionName(int f) => f >= 0 && f < data.Factions.Count ? data.Factions[f].Name : "no faction";
+        string FactionName(int f) => data.FactionAt(f)?.Name ?? "no faction";
+        var squads = world.Squads.All.Where(s => !s.Dead).ToLookup(s => s.Faction);
 
         return new DebugView(
             now,
             options.HuntThreshold,
             [.. report.Characters.Select(c => (c.Id, c.Name, c.Down))],
             [.. report.Towns.Select(t => (t.Number, t.Name))],
-            [.. ledger.Entries.Select(g => Grudge(world, g.Key, g.Value, ledger, cooldowns, memory, FactionName(g.Key.Faction)))],
+            [.. ledger.Entries.Select(g => Grudge(world, g.Key, g.Value, ledger, cooldowns, memory, squads, FactionName(g.Key.Faction)))],
             [.. runs.Select(r => Run(r, now, FactionName(r.Faction)))],
             rules,
             [.. cooldowns.Entries.Where(c => c.Value > now).Select(c => (c.Key, c.Value - now))],
@@ -103,16 +104,15 @@ public sealed record DebugView(
     }
 
     /// <summary>
-    /// One grudge with its squads and the grudge director's cooldown (its key: <c>rivalry.grudge/{faction}:{name}</c>).
+    /// One grudge with the faction's living squads (<paramref name="squads"/>) marked to hunt the character and the grudge director's cooldown
+    /// (its key: <c>rivalry.grudge/{faction}:{name}</c>).
     /// </summary>
-    static GrudgeView Grudge(World world, GrudgeKey key, float value, NotorietyLedger ledger, Cooldowns cooldowns, SquadMemory? memory, string faction)
+    static GrudgeView Grudge(World world, GrudgeKey key, float value, NotorietyLedger ledger, Cooldowns cooldowns, SquadMemory? memory,
+        ILookup<int, Squad> squads, string faction)
     {
-        string name = world.Characters.TryResolveNext(key.Who, out int slot) ? world.Characters.Cold(slot)?.Name ?? "" : "";
-        int marked = memory is null
-            ? 0
-            : world.Squads.All.Count(s => s.Faction == key.Faction && !s.Dead && memory.HasShort(world, s.Id, key.Who, MemoryTag.TempEnemy));
-        string cooldown = $"rivalry.grudge/{key.Faction}:{name}";
-        double again = cooldowns.Entries.FirstOrDefault(c => c.Key == cooldown).Value - world.GameHours;
+        string name = world.Characters.NameOf(key.Who);
+        int marked = memory is null ? 0 : squads[key.Faction].Count(s => memory.HasShort(world, s.Id, key.Who, MemoryTag.TempEnemy));
+        double again = cooldowns.Until($"rivalry.grudge/{key.Faction}:{name}") - world.GameHours;
         return new GrudgeView(faction, key.Who, name, value, ledger.HeldFloor(key.Faction, key.Who), marked, Math.Max(0, again));
     }
 

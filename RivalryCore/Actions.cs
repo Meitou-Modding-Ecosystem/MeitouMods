@@ -147,9 +147,8 @@ internal sealed class Actions(PopulationData data, PopulationSystem? population,
     static float LeaderDistance(World world, Squad squad, Vector3 at)
     {
         if (!world.Characters.TryResolveNext(squad.Leader, out int slot)) return float.MaxValue;
-        var p = world.Characters.Next[slot].Position;
-        return Vector2.Distance(new Vector2(p.X, p.Z), new Vector2(at.X, at.Z));
+        return Ground.FlatDistance(world.Characters.Next[slot].Position, at);
     }
 
-    string FactionName(int faction) => faction >= 0 && faction < data.Factions.Count ? data.Factions[faction].Name : $"faction {faction}";
+    string FactionName(int faction) => data.FactionAt(faction)?.Name ?? $"faction {faction}";
 }
