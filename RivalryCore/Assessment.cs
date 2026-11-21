@@ -111,7 +111,7 @@ public sealed class Assessment
     /// <summary>
     /// The travel time in game hours from the faction's base nearest a point to it (<see cref="Travel"/>), with <paramref name="home"/>'s names.
     /// </summary>
-    public double TravelHours(int faction, Vector3 to, string? home = null) => Travel.Hours(Data, Options, faction, new Vector2(to.X, to.Z), home);
+    public double TravelHours(int faction, Vector3 to, string? home = null) => Travel.Hours(Data, Options, faction, to.Flat(), home);
 
     /// <summary>
     /// Where a target stands: its character, else its town; null when neither is in the report.
@@ -173,7 +173,7 @@ public sealed class Assessment
     /// <summary>The campaign of a kind a raid or reinforcement by the faction would request (<see cref="Catalogue.CampaignFor"/>); null when it has none.</summary>
     public string? CampaignFor(int faction, CampaignKey key) => _catalogue.CampaignFor(faction, key);
 
-    public FactionData? Faction(int faction) => faction >= 0 && faction < Data.Factions.Count ? Data.Factions[faction] : null;
+    public FactionData? Faction(int faction) => Data.FactionAt(faction);
 
     bool Known(int faction) => PlayerFaction >= 0 && Data.Relations.Contains(faction) && Data.Relations.Contains(PlayerFaction);
 }

@@ -1,6 +1,6 @@
 # Rivalry Core (framework mod)
 
-**Status: proposed, mod version 0.6.2, code-mod API 2.** A code mod in `RivalryCore` (id `rivalry.core`) that lets the world's factions
+**Status: proposed, mod version 0.6.3, code-mod API 2.** A code mod in `RivalryCore` (id `rivalry.core`) that lets the world's factions
 inspect the player's setup and act on it: hunt a character, raid a weak rich town, reinforce a town that is losing a fight. Not rival-only: the
 same pipeline sends allies to help and friendly visitors. Built on [dependencies](https://github.com/Meitou-Modding-Ecosystem/MeitouClient/blob/master/docs/modding-dependencies.md); other mods add probes, conditions,
 target kinds, behaviours, rules and directors (see "Extension API"; how-to: [depending on Rivalry Core](depending-on-rivalry-core.md)). Needs the engine hooks of [modding](https://github.com/Meitou-Modding-Ecosystem/MeitouClient/blob/master/docs/modding.md) "World hooks".
@@ -93,7 +93,8 @@ has passed or the platoon is gone. **Unknown**: everything in play (see "Evidenc
 
 `SquadDriver`, for a behaviour that walks its squad itself instead of giving it a package: `Hold` (`PopulationSystem.HoldPlatoon` and
 `CharacterCold.Engaged` on each member, optionally the Sneak order), `Keep` (holds again; a hold is not saved, so driven runs call it every
-step), `GiveBack`, `Able` (members that can act), `WalkTo` (true within 20; a walk under way is left alone unless `redirect`) and `RollSkills`:
+step), `GiveBack`, `Able` (members that can act), `FirstLiving`, `WalkTo` (true within 20; a walk under way is left alone unless `redirect`
+and its goal is more than `RedirectSlack` (10) from the new point, since each new walk asks for a fresh path) and `RollSkills`:
 a number argument named `<skill>Min` (and `<skill>Max`), the skill a `StatsEnumerated` name in any case (`stealthMin`, `martialArtsMax`),
 gives every member that skill uniformly in the range when the squad loads. A run that ends, or whose squad unloads, gives the platoon back.
 
